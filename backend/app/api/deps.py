@@ -87,6 +87,13 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token 已失效，请重新登录",
         )
+
+    # 检查用户是否被封禁
+    if user.is_active != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账号已被封禁，请联系管理员",
+        )
     
     # 检查账号锁定状态
     if user.lockout_until:

@@ -9,7 +9,7 @@ from pathlib import Path
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.db.database import AsyncSessionLocal, init_db
 from app.db.models import User, ProductCategory, Product
@@ -51,8 +51,8 @@ async def init_sample_categories():
     """创建示例商品分类（三级树形结构）"""
     async with AsyncSessionLocal() as db:
         # 检查是否已有分类
-        result = await db.execute(select(ProductCategory))
-        if result.scalar_one_or_none():
+        result = await db.execute(select(func.count()).select_from(ProductCategory))
+        if (result.scalar() or 0) > 0:
             print("⚠️  商品分类已存在")
             return
         
@@ -140,8 +140,8 @@ async def init_sample_products():
     """创建示例商品（关联到三级分类）"""
     async with AsyncSessionLocal() as db:
         # 检查是否已有商品
-        result = await db.execute(select(Product))
-        if result.scalar_one_or_none():
+        result = await db.execute(select(func.count()).select_from(Product))
+        if (result.scalar() or 0) > 0:
             print("⚠️  示例商品已存在")
             return
         

@@ -5,17 +5,23 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import DatabaseSession, CurrentUser, CurrentAdmin
-from app.db.models import Order, OrderItem
+from app.db.models import Order, OrderItem, User
 from app.schemas.order_schema import (
     OrderCreate, OrderResponse, OrderListResponse, OrderStatusUpdate
 )
 from app.services.order_service import create_order_transaction, cancel_order_transaction
 
 router = APIRouter(prefix="/orders", tags=["订单"])
+
+
+def _attach_username(order: Order) -> None:
+    """给订单对象附加 username 字段，便于响应模型直接返回"""
+    if getattr(order, "user", None) is not None:
+        order.username = order.user.username
 
 
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
@@ -54,6 +60,7 @@ async def get_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None, description="订单状态筛选"),
+    product_name: Optional[str] = Query(None, description="按商品名称模糊搜索"),
     db: DatabaseSession = None,
     current_user: CurrentUser = None
 ):
@@ -67,6 +74,11 @@ async def get_orders(
     
     if status:
         query = query.where(Order.status == status)
+    if product_name:
+        kw = f"%{product_name}%"
+        query = query.where(
+            Order.items.any(OrderItem.product_name.like(kw))
+        )
     
     # 统计总数
     count_query = select(func.count()).select_from(query.subquery())
@@ -77,10 +89,12 @@ async def get_orders(
     offset = (page - 1) * page_size
     query = query.order_by(Order.created_at.desc())
     query = query.offset(offset).limit(page_size)
-    query = query.options(selectinload(Order.items))  # 预加载订单明细
+    query = query.options(selectinload(Order.items), selectinload(Order.user))  # 预加载订单明细+用户
     
     result = await db.execute(query)
     orders = result.scalars().all()
+    for order in orders:
+        _attach_username(order)
     
     return OrderListResponse(total=total, items=orders)
 
@@ -91,7 +105,7 @@ async def get_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items))
+        .options(selectinload(Order.items), selectinload(Order.user))
     )
     order = result.scalar_one_or_none()
     
@@ -101,6 +115,7 @@ async def get_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
             detail="订单不存在"
         )
     
+    _attach_username(order)
     return order
 
 
@@ -115,7 +130,7 @@ async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items))
+        .options(selectinload(Order.items), selectinload(Order.user))
     )
     order = result.scalar_one_or_none()
     
@@ -137,6 +152,7 @@ async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     await db.commit()
     await db.refresh(order)
     
+    _attach_username(order)
     return order
 
 
@@ -151,7 +167,7 @@ async def cancel_order(order_id: int, db: DatabaseSession, current_user: Current
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items))
+        .options(selectinload(Order.items), selectinload(Order.user))
     )
     order = result.scalar_one_or_none()
     
@@ -164,6 +180,7 @@ async def cancel_order(order_id: int, db: DatabaseSession, current_user: Current
     await cancel_order_transaction(db, order)
     await db.refresh(order)
     
+    _attach_username(order)
     return order
 
 
@@ -174,16 +191,31 @@ async def get_all_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
+    receiver_name: Optional[str] = Query(None, description="按收货人/用户名模糊搜索"),
+    product_name: Optional[str] = Query(None, description="按商品名称模糊搜索"),
     db: DatabaseSession = None,
     admin: CurrentAdmin = None
 ):
     """
     管理员查看所有订单
     """
-    query = select(Order)
+    query = select(Order).join(User, User.id == Order.user_id)
     
     if status:
         query = query.where(Order.status == status)
+    if receiver_name:
+        kw = f"%{receiver_name}%"
+        query = query.where(
+            or_(
+                User.username.like(kw),
+                Order.receiver_info.like(kw),
+            )
+        )
+    if product_name:
+        kw = f"%{product_name}%"
+        query = query.where(
+            Order.items.any(OrderItem.product_name.like(kw))
+        )
     
     # 统计总数
     count_query = select(func.count()).select_from(query.subquery())
@@ -194,12 +226,32 @@ async def get_all_orders(
     offset = (page - 1) * page_size
     query = query.order_by(Order.created_at.desc())
     query = query.offset(offset).limit(page_size)
-    query = query.options(selectinload(Order.items))
+    query = query.options(selectinload(Order.items), selectinload(Order.user))
     
     result = await db.execute(query)
     orders = result.scalars().all()
+    for order in orders:
+        _attach_username(order)
     
     return OrderListResponse(total=total, items=orders)
+
+
+@router.get("/admin/{order_id}", response_model=OrderResponse)
+async def get_admin_order_detail(order_id: int, db: DatabaseSession, admin: CurrentAdmin):
+    """管理员查看订单详情"""
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.items), selectinload(Order.user))
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="订单不存在"
+        )
+    _attach_username(order)
+    return order
 
 
 @router.put("/admin/{order_id}/status", response_model=OrderResponse)
@@ -219,7 +271,7 @@ async def update_order_status(
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id)
-        .options(selectinload(Order.items))
+        .options(selectinload(Order.items), selectinload(Order.user))
     )
     order = result.scalar_one_or_none()
     
@@ -235,4 +287,5 @@ async def update_order_status(
     await db.commit()
     await db.refresh(order)
     
+    _attach_username(order)
     return order

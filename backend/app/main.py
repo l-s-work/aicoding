@@ -2,13 +2,15 @@
 FastAPI 主应用入口
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.api.routers import _auth, _product, _order, _address, _ai
+from app.api.routers import _auth, _product, _order, _address, _ai, _admin
 
 
 @asynccontextmanager
@@ -33,6 +35,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ==================== 静态文件（上传资源） ====================
+
+UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
 
 # ==================== CORS 配置 ====================
 
@@ -52,6 +60,7 @@ app.include_router(_product.router)
 app.include_router(_order.router)
 app.include_router(_address.router)
 app.include_router(_ai.router)
+app.include_router(_admin.router)
 
 
 # ==================== 根路径 ====================

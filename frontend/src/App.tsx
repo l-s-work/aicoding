@@ -1,7 +1,21 @@
 import { RouterProvider } from 'react-router-dom';
 import { App as AntdApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import { createGlobalStyle } from 'styled-components';
 import router from '@/router';
+
+const GlobalBaseStyle = createGlobalStyle`
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+  }
+`;
 
 /**
  * 根组件
@@ -20,6 +34,7 @@ const App = () => {
         },
       }}
     >
+      <GlobalBaseStyle />
       <AntdApp>
         <RouterProvider router={router} />
       </AntdApp>

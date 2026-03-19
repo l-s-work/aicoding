@@ -36,6 +36,31 @@ class UserLogin(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    """忘记密码重置请求（轻量方案：用户名 + 邮箱 + 新密码）"""
+    username: str
+    email: EmailStr
+    new_password: str
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError("用户名长度必须在 3-50 个字符之间")
+        if not re.match(r"^[a-zA-Z0-9_]+$", v):
+            raise ValueError("用户名只能包含字母、数字和下划线")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError("新密码长度必须在 8-20 个字符之间")
+        if not re.search(r"[a-zA-Z]", v) or not re.search(r"[0-9]", v):
+            raise ValueError("新密码必须同时包含字母和数字")
+        return v
+
+
 class AccessTokenResponse(BaseModel):
     """仅 Access Token 响应 (用于刷新)"""
     access_token: str

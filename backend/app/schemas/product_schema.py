@@ -1,7 +1,7 @@
 """
 商品相关 Pydantic Schemas
 """
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import Optional
 
 
@@ -14,9 +14,23 @@ class CategoryBase(BaseModel):
     sort_order: int = 0
 
 
-class CategoryCreate(CategoryBase):
-    """创建分类请求"""
-    pass
+class CategoryCreate(BaseModel):
+    """创建分类请求（由后端自动生成 category_code 和 level）"""
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    parent_id: Optional[int] = None
+    sort_order: int = 0
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        name = v.strip()
+        if not name:
+            raise ValueError("分类名称不能为空")
+        if len(name) > 20:
+            raise ValueError("分类名称长度不能超过 20")
+        return name
 
 
 class CategoryResponse(CategoryBase):
@@ -24,6 +38,21 @@ class CategoryResponse(CategoryBase):
     id: int
     created_at: str
     
+    class Config:
+        from_attributes = True
+
+
+class CategoryTreeResponse(BaseModel):
+    """分类树响应"""
+    id: int
+    category_code: str
+    name: str
+    parent_id: Optional[int] = None
+    level: int
+    sort_order: int = 0
+    created_at: str
+    children: list["CategoryTreeResponse"] = Field(default_factory=list)
+
     class Config:
         from_attributes = True
 
@@ -88,3 +117,6 @@ class ProductListResponse(BaseModel):
     """商品列表响应"""
     total: int
     items: list[ProductResponse]
+
+
+CategoryTreeResponse.model_rebuild()

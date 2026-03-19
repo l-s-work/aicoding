@@ -25,7 +25,7 @@ JWT_SECRET_KEY=your-super-secret-jwt-key-please-change-this
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # 可选配置
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+CORS_ORIGINS=http://localhost:5174,http://127.0.0.1:5174
 ```
 
 **重要提示**：
@@ -129,7 +129,7 @@ A: 请检查：
 A: 在 `.env` 中配置前端地址：
 
 ```env
-CORS_ORIGINS=http://localhost:5173
+CORS_ORIGINS=http://localhost:5174
 ```
 
 ### Q: 数据库锁定错误

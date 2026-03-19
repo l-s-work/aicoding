@@ -13,7 +13,7 @@ import jwt
 from app.api.deps import DatabaseSession, CurrentUser
 from app.db.models import User, RefreshToken, AccessTokenBlocklist
 from app.schemas.auth_schema import (
-    UserRegister, UserLogin, TokenResponse, 
+    UserRegister, UserLogin, ForgotPasswordRequest, TokenResponse,
     AccessTokenResponse, UserResponse
 )
 from app.core.security import (
@@ -57,6 +57,7 @@ async def register(user_data: UserRegister, db: DatabaseSession):
         password_hash=hash_password(user_data.password),
         role="client",  # 默认为普通用户
         token_version=1,
+        is_active=1,
         failed_login_attempts=0,
     )
     
@@ -72,6 +73,38 @@ async def register(user_data: UserRegister, db: DatabaseSession):
         )
     
     return new_user
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+async def forgot_password(payload: ForgotPasswordRequest, db: DatabaseSession):
+    """
+    忘记密码（轻量重置）
+
+    - 通过「用户名 + 邮箱」校验身份（不引入邮件服务，保持轻量）
+    - 校验通过后更新密码哈希
+    - 强制旧会话失效：token_version + 1，并清理 refresh_tokens
+    - 无论账户是否存在，都返回 204，避免账号枚举
+    """
+    result = await db.execute(
+        select(User).where(
+            User.username == payload.username,
+            User.email == payload.email,
+        )
+    )
+    user = result.scalar_one_or_none()
+
+    # 防止账号枚举：未命中用户也返回 204
+    if not user:
+        return
+
+    user.password_hash = hash_password(payload.new_password)
+    user.failed_login_attempts = 0
+    user.lockout_until = None
+    user.token_version += 1
+
+    # 清理该用户所有 Refresh Token，避免旧会话继续换发新 AT
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
+    await db.commit()
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -112,6 +145,12 @@ async def login(credentials: UserLogin, response: Response, db: DatabaseSession)
     
     if not user:
         await handle_failed_login(None)
+
+    if user.is_active != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账号已被封禁，请联系管理员"
+        )
     
     # 检查账号锁定状态
     if user.lockout_until:

@@ -19,6 +19,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="client")  # client / admin
     token_version = Column(Integer, nullable=False, default=1)  # 用于强制踢出
+    is_active = Column(Integer, nullable=False, default=1)  # 1=正常，0=封禁
     
     # 登录安全字段
     failed_login_attempts = Column(Integer, default=0)

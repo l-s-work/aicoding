@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import useAuthStore from '../store/useAuthStore';
 import { post } from '../utils/request';
@@ -23,6 +23,31 @@ interface LoginResponse {
   };
 }
 
+/** 根据用户角色安全地计算登录后跳转路径，避免 admin 被回跳到 C 端路由触发 403 */
+function resolveLoginRedirect(from: string | undefined, role: 'client' | 'admin'): string {
+  const adminDefault = '/admin/dashboard';
+  const clientDefault = '/';
+
+  const safeFrom = (from ?? '').trim();
+  if (!safeFrom) return role === 'admin' ? adminDefault : clientDefault;
+
+  // 避免回跳到公开登录相关页或无权限页
+  const blockedPrefixes = ['/login', '/register', '/forgot-password', '/403', '/404'];
+  if (blockedPrefixes.some(prefix => safeFrom === prefix || safeFrom.startsWith(`${prefix}/`))) {
+    return role === 'admin' ? adminDefault : clientDefault;
+  }
+
+  const isAdminPath = safeFrom === '/admin' || safeFrom.startsWith('/admin/');
+  if (role === 'admin') {
+    // admin 回跳 /admin 时补到 dashboard；误回跳 C 端路径时改走 B 端首页
+    if (safeFrom === '/admin') return adminDefault;
+    return isAdminPath ? safeFrom : adminDefault;
+  }
+
+  // client 误回跳 admin 路径时改走 C 端首页
+  return isAdminPath ? clientDefault : safeFrom;
+}
+
 /**
  * 登录页面组件
  *
@@ -40,7 +65,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   // 获取登录前用户尝试访问的页面（从 PrivateRoute 传递的 state）
-  const from = (location.state as { from?: string })?.from || '/';
+  const from = (location.state as { from?: string })?.from;
 
   /**
    * 表单提交处理
@@ -58,8 +83,9 @@ const Login = () => {
 
       message.success(`欢迎回来，${response.user.username}！`);
 
-      // 跳转到登录前访问的页面，避免用户重复导航
-      navigate(from, { replace: true });
+      // 按角色做安全回跳，防止 admin 回跳到 C 端路径导致 403
+      const targetPath = resolveLoginRedirect(from, response.user.role);
+      navigate(targetPath, { replace: true });
     } catch (error) {
       // 后端错误信息已通过 Axios 拦截器处理，直接展示
       message.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
@@ -101,6 +127,14 @@ const Login = () => {
             ]}
           >
             <Input.Password prefix={<LockOutlined />} placeholder="请输入密码（8-20位，需包含字母和数字）" autoComplete="current-password" />
+          </Form.Item>
+
+          {/* 账号辅助操作：找回密码 + 注册账号 */}
+          <Form.Item>
+            <ActionRow>
+              <ActionLink to="/forgot-password">忘记密码？</ActionLink>
+              <ActionLink to="/register">注册账号</ActionLink>
+            </ActionRow>
           </Form.Item>
 
           {/* 登录按钮 */}
@@ -165,7 +199,25 @@ const LoginButton = styled(Button)`
   height: 48px;
   font-size: 16px;
   font-weight: 500;
-  margin-top: 8px;
+`;
+
+/** 操作行：左右分布忘记密码和注册入口 */
+const ActionRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+/** 入口链接：保持轻量，避免按钮层级抢焦点 */
+const ActionLink = styled(Link)`
+  font-size: 14px;
+  color: #1677ff;
+  text-decoration: none;
+
+  &:hover {
+    color: #4096ff;
+    text-decoration: underline;
+  }
 `;
 
 /** 开发提示信息：浅灰色提示框 */

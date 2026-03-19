@@ -72,3 +72,8 @@ async def init_db():
                 "ON user_addresses (user_id) WHERE is_default = 1"
             )
         )
+        # 兼容已存在库：users 表补充 is_active 字段（若不存在）
+        user_columns = await conn.execute(text("PRAGMA table_info(users)"))
+        user_column_names = {row[1] for row in user_columns.fetchall()}
+        if "is_active" not in user_column_names:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1"))

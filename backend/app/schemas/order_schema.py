@@ -49,6 +49,7 @@ class OrderResponse(BaseModel):
     id: int
     order_no: str
     user_id: int
+    username: Optional[str] = None
     total_amount: float
     status: str
     receiver_info: str  # JSON 字符串

@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"  # 可替换为代理地址
     
     # CORS 配置
-    CORS_ORIGINS: str = "http://localhost:5173"
+    CORS_ORIGINS: str = "http://localhost:5174"
     
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 const isProd = process.env.NODE_ENV === 'production';
+const parsedDevPort = Number(process.env.VITE_DEV_PORT ?? 5180);
+const devPort = Number.isInteger(parsedDevPort) && parsedDevPort > 0 ? parsedDevPort : 5180;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -14,11 +16,23 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    host: '0.0.0.0',
+    // 默认使用 5180，避免和 Vite 常见默认端口 5173 冲突；
+    // 也可通过 VITE_DEV_PORT 指定固定端口
+    port: devPort,
+    strictPort: false,
     // 开发环境代理，将 /api 请求转发到 FastAPI 后端
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // 固定走 IPv4，避免 localhost 在部分环境解析到 ::1 导致 ECONNREFUSED
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        // 前端统一使用 /api 前缀，代理到后端时去掉该前缀
+        rewrite: p => p.replace(/^\/api/, ''),
+      },
+      '/uploads': {
+        // 商品图片静态资源代理（开发环境）
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },

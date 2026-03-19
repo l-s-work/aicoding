@@ -8,14 +8,23 @@ const ClientHome = lazy(() => import('@/pages/client/Home'));
 const ClientProduct = lazy(() => import('@/pages/client/Product'));
 const ClientCart = lazy(() => import('@/pages/client/Cart'));
 const ClientCheckout = lazy(() => import('@/pages/client/Checkout'));
+const ClientOrders = lazy(() => import('@/pages/client/Orders'));
+const ClientOrderDetail = lazy(() => import('@/pages/client/OrderDetail'));
+const ClientAccount = lazy(() => import('@/pages/client/Account'));
+const ClientAppLayout = lazy(() => import('@/components/Layout/ClientAppLayout'));
 
 // ===== 懒加载：B端页面（打包时独立 Chunk，不发给普通买家） =====
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
 const AdminProducts = lazy(() => import('@/pages/admin/Products'));
+const AdminProductEditor = lazy(() => import('@/pages/admin/ProductEditor'));
 const AdminOrders = lazy(() => import('@/pages/admin/Orders'));
+const AdminUsers = lazy(() => import('@/pages/admin/Users'));
+const AdminAppLayout = lazy(() => import('@/components/Layout/AdminAppLayout'));
 
 // 通用页面（无需登录）
 const Login = lazy(() => import('@/pages/Login'));
+const Register = lazy(() => import('@/pages/Register'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 const Forbidden = lazy(() => import('@/pages/Forbidden'));
 
@@ -37,6 +46,22 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: '/register',
+    element: (
+      <Suspense fallback={<PageFallback />}>
+        <Register />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/forgot-password',
+    element: (
+      <Suspense fallback={<PageFallback />}>
+        <ForgotPassword />
+      </Suspense>
+    ),
+  },
+  {
     path: '/403',
     element: (
       <Suspense fallback={<PageFallback />}>
@@ -50,36 +75,69 @@ const router = createBrowserRouter([
     element: <PrivateRoute requiredRole="client" />,
     children: [
       {
-        path: '/',
         element: (
           <Suspense fallback={<PageFallback />}>
-            <ClientHome />
+            <ClientAppLayout />
           </Suspense>
         ),
-      },
-      {
-        path: '/product/:id',
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <ClientProduct />
-          </Suspense>
-        ),
-      },
-      {
-        path: '/cart',
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <ClientCart />
-          </Suspense>
-        ),
-      },
-      {
-        path: '/checkout',
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <ClientCheckout />
-          </Suspense>
-        ),
+        children: [
+          {
+            path: '/',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientHome />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'product/:id',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientProduct />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'cart',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientCart />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'checkout',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientCheckout />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'orders',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientOrders />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'orders/:id',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientOrderDetail />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'account',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientAccount />
+              </Suspense>
+            ),
+          },
+        ],
       },
     ],
   },
@@ -90,28 +148,61 @@ const router = createBrowserRouter([
     element: <PrivateRoute requiredRole="admin" />,
     children: [
       {
-        path: 'dashboard',
         element: (
           <Suspense fallback={<PageFallback />}>
-            <AdminDashboard />
+            <AdminAppLayout />
           </Suspense>
         ),
-      },
-      {
-        path: 'products',
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <AdminProducts />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'orders',
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <AdminOrders />
-          </Suspense>
-        ),
+        children: [
+          {
+            path: 'dashboard',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminDashboard />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'products',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminProducts />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'products/new',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminProductEditor />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'products/:id/edit',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminProductEditor />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'orders',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminOrders />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'users',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminUsers />
+              </Suspense>
+            ),
+          },
+        ],
       },
     ],
   },
