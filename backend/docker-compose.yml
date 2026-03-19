@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  backend:
+    build: .
+    container_name: ecommerce-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # 数据持久化 - 数据库文件
+      - ./data:/app/data
+      # 环境配置文件
+      - ./.env:/app/.env:ro
+    environment:
+      # 使用容器内的数据卷路径
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/ecommerce.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ecommerce-network
+
+  # 可选: Nginx 反向代理
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: ecommerce-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - ecommerce-network
+
+networks:
+  ecommerce-network:
+    driver: bridge

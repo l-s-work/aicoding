@@ -1,0 +1,238 @@
+"""
+订单路由：创建订单、查询订单、管理订单
+"""
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, status, Query
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
+
+from app.api.deps import DatabaseSession, CurrentUser, CurrentAdmin
+from app.db.models import Order, OrderItem
+from app.schemas.order_schema import (
+    OrderCreate, OrderResponse, OrderListResponse, OrderStatusUpdate
+)
+from app.services.order_service import create_order_transaction, cancel_order_transaction
+
+router = APIRouter(prefix="/orders", tags=["订单"])
+
+
+@router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(
+    order_data: OrderCreate,
+    db: DatabaseSession,
+    current_user: CurrentUser
+):
+    """
+    创建订单
+    
+    - 验证库存并原子扣减
+    - 保存地址快照和价格快照
+    - 生成唯一订单号
+    """
+    # 将 Pydantic 模型转为字典
+    items = [{"product_id": item.product_id, "quantity": item.quantity} 
+             for item in order_data.items]
+    
+    # 调用服务层创建订单 (事务)
+    order = await create_order_transaction(
+        db=db,
+        user_id=current_user.id,
+        address_id=order_data.address_id,
+        items=items
+    )
+    
+    # 加载订单明细
+    await db.refresh(order, ["items"])
+    
+    return order
+
+
+@router.get("", response_model=OrderListResponse)
+async def get_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None, description="订单状态筛选"),
+    db: DatabaseSession = None,
+    current_user: CurrentUser = None
+):
+    """
+    获取当前用户的订单列表
+    
+    - 支持分页
+    - 支持按状态筛选
+    """
+    query = select(Order).where(Order.user_id == current_user.id)
+    
+    if status:
+        query = query.where(Order.status == status)
+    
+    # 统计总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # 分页查询（按创建时间倒序）
+    offset = (page - 1) * page_size
+    query = query.order_by(Order.created_at.desc())
+    query = query.offset(offset).limit(page_size)
+    query = query.options(selectinload(Order.items))  # 预加载订单明细
+    
+    result = await db.execute(query)
+    orders = result.scalars().all()
+    
+    return OrderListResponse(total=total, items=orders)
+
+
+@router.get("/{order_id}", response_model=OrderResponse)
+async def get_order(order_id: int, db: DatabaseSession, current_user: CurrentUser):
+    """获取订单详情"""
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id, Order.user_id == current_user.id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="订单不存在"
+        )
+    
+    return order
+
+
+@router.post("/{order_id}/pay", response_model=OrderResponse)
+async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUser):
+    """
+    假支付接口
+    
+    - 将订单状态从 pending 改为 paid
+    - 实际项目应对接真实支付网关
+    """
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id, Order.user_id == current_user.id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="订单不存在"
+        )
+    
+    if order.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"订单状态错误（当前: {order.status}）"
+        )
+    
+    order.status = "paid"
+    order.updated_at = datetime.utcnow().isoformat()
+    
+    await db.commit()
+    await db.refresh(order)
+    
+    return order
+
+
+@router.post("/{order_id}/cancel", response_model=OrderResponse)
+async def cancel_order(order_id: int, db: DatabaseSession, current_user: CurrentUser):
+    """
+    取消订单
+    
+    - 只能取消待支付订单
+    - 自动回滚库存
+    """
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id, Order.user_id == current_user.id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="订单不存在"
+        )
+    
+    await cancel_order_transaction(db, order)
+    await db.refresh(order)
+    
+    return order
+
+
+# ==================== 管理员接口 ====================
+
+@router.get("/admin/all", response_model=OrderListResponse)
+async def get_all_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    db: DatabaseSession = None,
+    admin: CurrentAdmin = None
+):
+    """
+    管理员查看所有订单
+    """
+    query = select(Order)
+    
+    if status:
+        query = query.where(Order.status == status)
+    
+    # 统计总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # 分页
+    offset = (page - 1) * page_size
+    query = query.order_by(Order.created_at.desc())
+    query = query.offset(offset).limit(page_size)
+    query = query.options(selectinload(Order.items))
+    
+    result = await db.execute(query)
+    orders = result.scalars().all()
+    
+    return OrderListResponse(total=total, items=orders)
+
+
+@router.put("/admin/{order_id}/status", response_model=OrderResponse)
+async def update_order_status(
+    order_id: int,
+    status_data: OrderStatusUpdate,
+    db: DatabaseSession,
+    admin: CurrentAdmin
+):
+    """
+    管理员更新订单状态
+    
+    - 发货: paid → shipped
+    - 完成: shipped → completed
+    - 终止: * → cancelled
+    """
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="订单不存在"
+        )
+    
+    order.status = status_data.status
+    order.updated_at = datetime.utcnow().isoformat()
+    
+    await db.commit()
+    await db.refresh(order)
+    
+    return order

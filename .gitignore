@@ -1,0 +1,13 @@
+# Root-level ignores
+.venv/
+docs.zip
+
+# Common IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Python cache (fallback for root scripts)
+__pycache__/
+*.py[cod]
