@@ -9,14 +9,16 @@ interface ClientPageHeaderProps {
   title: string;
   /** 当历史栈不足时的兜底返回路径 */
   fallbackPath?: string;
+  /** 是否显示返回按钮（菜单首页默认不显示） */
+  showBack?: boolean;
 }
 
 /**
  * C 端页面标题栏
- * - 统一提供返回按钮
+ * - 支持按页面场景显示/隐藏返回按钮
  * - 避免各页面重复实现导航逻辑
  */
-const ClientPageHeader = ({ title, fallbackPath = '/' }: ClientPageHeaderProps) => {
+const ClientPageHeader = ({ title, fallbackPath = '/', showBack = false }: ClientPageHeaderProps) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
@@ -28,11 +30,13 @@ const ClientPageHeader = ({ title, fallbackPath = '/' }: ClientPageHeaderProps) 
   };
 
   return (
-    <HeaderRow align="center" justify="space-between">
+    <HeaderRow align="center">
       <Space align="center" size={12}>
-        <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
-          返回
-        </Button>
+        {showBack ? (
+          <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
+            返回
+          </Button>
+        ) : null}
         <Title level={3} style={{ margin: 0 }}>
           {title}
         </Title>

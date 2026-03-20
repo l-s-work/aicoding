@@ -153,7 +153,8 @@ async def create_order_transaction(
             order_no=order_no,
             user_id=user_id,
             total_amount=total_amount,
-            status="pending",
+            # 业务约定：下单成功即视为已支付，后续由管理员发货
+            status="paid",
             receiver_info=json.dumps(receiver_info, ensure_ascii=False),
             created_at=datetime.utcnow().isoformat(),
         )
@@ -199,11 +200,11 @@ async def cancel_order_transaction(db: AsyncSession, order: Order) -> None:
     Raises:
         HTTPException: 订单状态不允许取消
     """
-    # 只有 pending 状态的订单可以取消
-    if order.status != "pending":
+    # 下单即支付后，允许在未发货前取消
+    if order.status not in ("pending", "paid"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="只有待支付订单可以取消"
+            detail="只有待支付/已支付（未发货）订单可以取消"
         )
     
     await db.execute(text("BEGIN IMMEDIATE"))

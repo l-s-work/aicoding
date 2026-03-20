@@ -173,9 +173,21 @@ function setAccessToken(newToken: string): void {
 }
 
 // ===== 联锁清退：清除所有本地授权状态并跳转登录页 =====
-function forceLogout(): void {
+function forceLogout(reason?: 'banned'): void {
+  try {
+    const raw = localStorage.getItem('auth-storage');
+    const username: string | undefined = raw ? JSON.parse(raw)?.state?.user?.username : undefined;
+    if (reason === 'banned' && username) {
+      // 登录页用于恢复申请默认填充用户名
+      sessionStorage.setItem('recovery-username', username);
+    }
+  } catch {
+    // 忽略本地解析异常，确保后续仍可清理并跳转
+  }
+
   localStorage.removeItem('auth-storage');
-  window.location.replace('/login');
+  const loginPath = reason === 'banned' ? '/login?reason=banned' : '/login';
+  window.location.replace(loginPath);
 }
 
 // ===== Refresh Token 无感刷新控制 =====
@@ -246,11 +258,24 @@ request.interceptors.response.use(
   async (error: AxiosError) => {
     const status = error.response?.status;
     const originalRequest = error.config;
+    const detail = (error.response?.data as { detail?: string })?.detail ?? '';
+    const requestUrl = originalRequest?.url ?? '';
+    const isLoginRequest = requestUrl.includes('/auth/login');
 
     // 403 表示角色越权或账号被封禁，直接清退
     if (status === 403) {
+      if (detail.includes('封禁')) {
+        if (!isLoginRequest) {
+          forceLogout('banned');
+        }
+        return Promise.reject(new Error('账号已被封禁，请联系管理员'));
+      }
+      // 登录接口的 403 由登录页自行处理（例如展示“申请恢复”入口）
+      if (isLoginRequest) {
+        return Promise.reject(new Error(detail || '登录失败'));
+      }
       forceLogout();
-      return Promise.reject(new Error('权限不足，已退出登录'));
+      return Promise.reject(new Error(detail || '权限不足，已退出登录'));
     }
 
     // 401 且非刷新接口本身：尝试无感刷新 Access Token
@@ -267,7 +292,7 @@ request.interceptors.response.use(
     }
 
     // 其他错误：将错误信息以可读格式透传给业务层
-    const message = (error.response?.data as { detail?: string })?.detail || error.message || '请求失败，请稍后重试';
+    const message = detail || error.message || '请求失败，请稍后重试';
     return Promise.reject(new Error(message));
   }
 );

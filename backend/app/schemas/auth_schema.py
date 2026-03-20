@@ -92,6 +92,30 @@ class ForgotPasswordRequest(BaseModel):
         return v
 
 
+class AccountRecoveryApplyRequest(BaseModel):
+    """账号恢复申请（封禁用户在登录页发起）"""
+    username: str
+    reason: str
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        username = v.strip()
+        if len(username) < 3 or len(username) > 50:
+            raise ValueError("用户名长度必须在 3-50 个字符之间")
+        if not re.match(r"^[a-zA-Z0-9_]+$", username):
+            raise ValueError("用户名只能包含字母、数字和下划线")
+        return username
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, v: str) -> str:
+        reason = v.strip()
+        if len(reason) < 5 or len(reason) > 500:
+            raise ValueError("申请原因长度必须在 5-500 个字符之间")
+        return reason
+
+
 class AccessTokenResponse(BaseModel):
     """仅 Access Token 响应 (用于刷新)"""
     access_token: str

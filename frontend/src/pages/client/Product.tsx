@@ -4,7 +4,7 @@ import { Button, Card, Descriptions, Modal, Skeleton, Space, Tag, Typography, me
 import styled from 'styled-components';
 import { get } from '@/utils/request';
 import useCartStore from '@/store/useCartStore';
-import { saleStatusMap } from '@/utils/dataformat';
+import { formatAmount, saleStatusMap } from '@/utils/dataformat';
 import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 
 const { Title, Paragraph } = Typography;
@@ -45,13 +45,17 @@ const ProductPage = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
-    addItem({
+    const added = addItem({
       productId: product.id,
       name: product.name,
       cover: product.image_url || '',
       price: product.price,
     });
-    message.success('已加入购物车');
+    if (added) {
+      message.success('已加入购物车');
+    } else {
+      message.info('该商品已在购物车中，可直接去结算调整数量');
+    }
   };
 
   const handleBuyNow = () => {
@@ -62,7 +66,7 @@ const ProductPage = () => {
     }
     Modal.confirm({
       title: '确认立即购买？',
-      content: '下一步将进入结算页，请选择收货地址并进行下单二次确认。',
+      // content: '下一步将进入结算页，请选择收货地址并进行下单二次确认。',
       okText: '去结算',
       cancelText: '取消',
       onOk: () => {
@@ -86,7 +90,7 @@ const ProductPage = () => {
 
   return (
     <ContentWrap>
-      <ClientPageHeader title="商品详情" fallbackPath="/" />
+      <ClientPageHeader title="商品详情" fallbackPath="/" showBack />
       {loading || !product ? (
         <Skeleton active />
       ) : (
@@ -96,24 +100,16 @@ const ProductPage = () => {
             <InfoArea>
               <Title level={3}>{product.name}</Title>
               <Space size={10}>
-                <Price>¥{product.price.toFixed(2)}</Price>
+                <Price>{formatAmount(product.price)}</Price>
                 <Tag color={product.status === 'on_sale' ? 'green' : 'default'}>{saleStatusMap[product.status]}</Tag>
                 <Tag color={product.stock > 0 ? 'blue' : 'red'}>库存 {product.stock}</Tag>
               </Space>
               <Paragraph style={{ marginTop: 12 }}>{product.description || '暂无描述'}</Paragraph>
               <Space>
-                <Button
-                  type="default"
-                  disabled={product.status !== 'on_sale' || product.stock <= 0}
-                  onClick={handleAddToCart}
-                >
+                <Button type="default" disabled={product.status !== 'on_sale' || product.stock <= 0} onClick={handleAddToCart}>
                   加入购物车
                 </Button>
-                <Button
-                  type="primary"
-                  disabled={product.status !== 'on_sale' || product.stock <= 0}
-                  onClick={handleBuyNow}
-                >
+                <Button type="primary" disabled={product.status !== 'on_sale' || product.stock <= 0} onClick={handleBuyNow}>
                   立即购买
                 </Button>
               </Space>

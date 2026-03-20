@@ -128,7 +128,7 @@ const Addresses = () => {
 
   return (
     <ContentWrap>
-      <ClientPageHeader title="地址管理" fallbackPath="/" />
+      <ClientPageHeader title="地址管理" />
       <Card
         extra={
           <Button type="primary" onClick={openCreateModal}>
@@ -194,7 +194,25 @@ const Addresses = () => {
           <Form.Item label="收货人" name="receiver_name" rules={[{ required: true, message: '请输入收货人姓名' }]}>
             <Input maxLength={50} />
           </Form.Item>
-          <Form.Item label="手机号" name="phone" rules={[{ required: true, message: '请输入手机号' }]}>
+          <Form.Item
+            label="手机号"
+            name="phone"
+            rules={[
+              { required: true, message: '请输入手机号' },
+              {
+                validator: (_, value: string) => {
+                  const phone = (value ?? '').trim();
+                  if (!phone) {
+                    return Promise.resolve();
+                  }
+                  if (!/^1[3-9]\d{9}$/.test(phone)) {
+                    return Promise.reject(new Error('请输入有效的 11 位手机号'));
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
             <Input maxLength={11} />
           </Form.Item>
           <AddressRow>

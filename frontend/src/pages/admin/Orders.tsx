@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button, Drawer, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
 import styled from 'styled-components';
 import { get, put } from '@/utils/request';
-import { orderStatusMap } from '@/utils/dataformat';
+import { formatAmount, orderStatusMap } from '@/utils/dataformat';
 
 const { Title } = Typography;
 
@@ -194,7 +194,7 @@ const Orders = () => {
               }
             },
           },
-          { title: '金额', render: (_, row) => `¥${row.total_amount.toFixed(2)}` },
+          { title: '金额', render: (_, row) => formatAmount(row.total_amount) },
           {
             title: '状态',
             render: (_, row) => <Tag color={statusColorMap[row.status] ?? 'default'}>{orderStatusMap[row.status] ?? row.status}</Tag>,
@@ -206,13 +206,14 @@ const Orders = () => {
                 size="small"
                 value={row.status}
                 loading={statusUpdatingId === row.id}
+                disabled={row.status === 'completed' || row.status === 'cancelled'}
                 style={{ width: 130 }}
                 options={[
                   { label: orderStatusMap.pending, value: 'pending' },
                   { label: orderStatusMap.paid, value: 'paid' },
                   { label: orderStatusMap.shipped, value: 'shipped' },
-                  { label: orderStatusMap.completed, value: 'completed' },
                   { label: orderStatusMap.cancelled, value: 'cancelled' },
+                  { label: orderStatusMap.completed, value: 'completed' },
                 ]}
                 onChange={value => void handleStatusUpdate(row.id, value)}
               />
@@ -228,20 +229,19 @@ const Orders = () => {
           },
         ]}
       />
-      <Drawer
-        width={620}
-        title="订单详情"
-        open={!!detailOrder}
-        onClose={() => setDetailOrder(null)}
-        destroyOnClose
-      >
+      <Drawer width={620} title="订单详情" open={!!detailOrder} onClose={() => setDetailOrder(null)} destroyOnClose>
         {detailOrder ? (
           <Space direction="vertical" style={{ width: '100%' }} size={12}>
             <div>订单号：{detailOrder.order_no}</div>
             <div>用户：{detailOrder.username ?? '-'}</div>
             <div>状态：{orderStatusMap[detailOrder.status] ?? detailOrder.status}</div>
             <div>收货人：{detailReceiverInfo?.receiver_name ?? '-'}</div>
-            <div>收货地址：{[detailReceiverInfo?.province, detailReceiverInfo?.city, detailReceiverInfo?.district, detailReceiverInfo?.detail_address].filter(Boolean).join(' ')}</div>
+            <div>
+              收货地址：
+              {[detailReceiverInfo?.province, detailReceiverInfo?.city, detailReceiverInfo?.district, detailReceiverInfo?.detail_address]
+                .filter(Boolean)
+                .join(' ')}
+            </div>
             <Table
               rowKey="id"
               size="small"
@@ -250,7 +250,7 @@ const Orders = () => {
               columns={[
                 { title: '商品', dataIndex: 'product_name' },
                 { title: '数量', dataIndex: 'quantity', width: 80 },
-                { title: '成交单价', render: (_, row) => `¥${row.buy_price.toFixed(2)}` },
+                { title: '成交单价', render: (_, row) => formatAmount(row.buy_price) },
               ]}
             />
           </Space>

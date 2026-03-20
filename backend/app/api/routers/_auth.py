@@ -11,10 +11,10 @@ from sqlalchemy.exc import IntegrityError
 import jwt
 
 from app.api.deps import DatabaseSession, CurrentUser
-from app.db.models import User, RefreshToken, AccessTokenBlocklist
+from app.db.models import User, RefreshToken, AccessTokenBlocklist, AccountRecoveryRequest
 from app.schemas.auth_schema import (
     UserRegister, UserLogin, ForgotPasswordRequest, TokenResponse,
-    AccessTokenResponse, UserResponse, UserProfileUpdate, ChangePasswordRequest
+    AccessTokenResponse, UserResponse, UserProfileUpdate, ChangePasswordRequest, AccountRecoveryApplyRequest
 )
 from app.core.security import (
     hash_password, verify_password,
@@ -105,6 +105,52 @@ async def forgot_password(payload: ForgotPasswordRequest, db: DatabaseSession):
     # 清理该用户所有 Refresh Token，避免旧会话继续换发新 AT
     await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
     await db.commit()
+
+
+@router.post("/recovery-request", status_code=status.HTTP_201_CREATED)
+async def apply_account_recovery(payload: AccountRecoveryApplyRequest, db: DatabaseSession):
+    """
+    封禁账号恢复申请
+
+    - 用户在登录页收到“账号被封禁”提示后可发起
+    - 同一账号同一时刻仅允许一个 pending 申请，避免重复提交
+    """
+    result = await db.execute(select(User).where(User.username == payload.username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+    if user.is_active == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前账号状态正常，无需申请恢复"
+        )
+
+    pending_request = await db.execute(
+        select(AccountRecoveryRequest).where(
+            AccountRecoveryRequest.user_id == user.id,
+            AccountRecoveryRequest.status == "pending",
+        )
+    )
+    if pending_request.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="你已有待处理的恢复申请，请勿重复提交"
+        )
+
+    request_record = AccountRecoveryRequest(
+        user_id=user.id,
+        username=user.username,
+        reason=payload.reason.strip(),
+        status="pending",
+        created_at=datetime.utcnow().isoformat(),
+    )
+    db.add(request_record)
+    await db.commit()
+
+    return {"message": "恢复申请已提交，请等待管理员处理"}
 
 
 @router.post("/login", response_model=TokenResponse)

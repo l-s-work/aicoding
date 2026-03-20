@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import useCartStore from '@/store/useCartStore';
 import { get } from '@/utils/request';
-import { saleStatusMap } from '@/utils/dataformat';
+import { formatAmount, saleStatusMap } from '@/utils/dataformat';
 import { buildCategoryCascaderOptions } from '@/utils/category';
 import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 
@@ -43,13 +43,18 @@ const Home = () => {
   const [categories, setCategories] = useState<CategoryNode[]>([]);
 
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(8);
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState<'on_sale' | 'off_sale' | undefined>(undefined);
-  const [level, setLevel] = useState<number | undefined>(undefined);
-  const [categoryPath, setCategoryPath] = useState<number[]>([]);
+  // 多选分类：每一项都是一个完整路径（如 [1, 3, 9]）
+  const [categoryPaths, setCategoryPaths] = useState<number[][]>([]);
 
-  const selectedCategoryId = categoryPath.length > 0 ? categoryPath[categoryPath.length - 1] : undefined;
+  const selectedCategoryIds = useMemo(() => {
+    const leafIds = categoryPaths
+      .map(path => path[path.length - 1])
+      .filter((id): id is number => typeof id === 'number');
+    return Array.from(new Set(leafIds));
+  }, [categoryPaths]);
   const cascaderOptions = useMemo(() => buildCategoryCascaderOptions(categories), [categories]);
 
   const fetchCategories = async () => {
@@ -66,8 +71,21 @@ const Home = () => {
           page_size: pageSize,
           keyword: keyword || undefined,
           status,
-          level,
-          category_id: selectedCategoryId,
+          category_ids: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+        },
+        paramsSerializer: {
+          serialize: params => {
+            const searchParams = new URLSearchParams();
+            Object.entries(params).forEach(([key, value]) => {
+              if (value === undefined || value === null || value === '') return;
+              if (Array.isArray(value)) {
+                value.forEach(item => searchParams.append(key, String(item)));
+                return;
+              }
+              searchParams.append(key, String(value));
+            });
+            return searchParams.toString();
+          },
         },
       });
       setProducts(data.items);
@@ -85,16 +103,20 @@ const Home = () => {
 
   useEffect(() => {
     void fetchProducts();
-  }, [page, pageSize, keyword, status, level, selectedCategoryId]);
+  }, [page, pageSize, keyword, status, selectedCategoryIds]);
 
   const handleAddToCart = (product: ProductItem) => {
-    addItem({
+    const added = addItem({
       productId: product.id,
       name: product.name,
       cover: product.image_url || '',
       price: product.price,
     });
-    message.success('已加入购物车');
+    if (added) {
+      message.success('已加入购物车');
+    } else {
+      message.info('该商品已在购物车中，可直接去结算调整数量');
+    }
   };
 
   const handleBuyNow = (product: ProductItem) => {
@@ -129,7 +151,7 @@ const Home = () => {
 
   return (
     <ContentWrap>
-      <ClientPageHeader title="商品列表" fallbackPath="/" />
+      <ClientPageHeader title="商品列表" />
 
       <FilterRow>
         <FilterItem>
@@ -161,7 +183,7 @@ const Home = () => {
             ]}
           />
         </FilterItem>
-        <FilterItem>
+        {/* <FilterItem>
           <FilterLabel>层级</FilterLabel>
           <Select
             allowClear
@@ -178,19 +200,20 @@ const Home = () => {
               { label: '三级分类', value: 3 },
             ]}
           />
-        </FilterItem>
+        </FilterItem> */}
         <FilterItem>
           <FilterLabel>分类</FilterLabel>
           <Cascader
             allowClear
-            changeOnSelect
-            placeholder="按分类筛选"
+            multiple
+            placeholder="按分类多选筛选"
             style={{ width: 280 }}
             options={cascaderOptions}
-            value={categoryPath}
+            value={categoryPaths}
             onChange={value => {
               setPage(1);
-              setCategoryPath((value as number[]) ?? []);
+              const nextPaths = ((value as Array<Array<string | number>>) ?? []).map(path => path.map(id => Number(id)));
+              setCategoryPaths(nextPaths);
             }}
           />
         </FilterItem>
@@ -217,9 +240,22 @@ const Home = () => {
             <ProductCol key={product.id} xs={24} sm={12} lg={8} xl={6}>
               <ProductCard
                 hoverable
-                cover={<Cover src={product.image_url || 'https://placehold.co/600x360?text=No+Image'} alt={product.name} />}
+                onClick={() => navigate(`/product/${product.id}`)}
+                cover={
+                  <CoverWrap>
+                    <Cover src={product.image_url || 'https://placehold.co/600x360?text=No+Image'} alt={product.name} />
+                  </CoverWrap>
+                }
                 actions={[
-                  <ActionButton key="detail" type="link" className="action-btn" onClick={() => navigate(`/product/${product.id}`)}>
+                  <ActionButton
+                    key="detail"
+                    type="link"
+                    className="action-btn"
+                    onClick={event => {
+                      event.stopPropagation();
+                      navigate(`/product/${product.id}`);
+                    }}
+                  >
                     查看详情
                   </ActionButton>,
                   <ActionButton
@@ -227,7 +263,10 @@ const Home = () => {
                     type="link"
                     className="action-btn"
                     disabled={product.status !== 'on_sale' || product.stock <= 0}
-                    onClick={() => handleAddToCart(product)}
+                    onClick={event => {
+                      event.stopPropagation();
+                      handleAddToCart(product);
+                    }}
                   >
                     加入购物车
                   </ActionButton>,
@@ -236,7 +275,10 @@ const Home = () => {
                     type="link"
                     className="action-btn"
                     disabled={product.status !== 'on_sale' || product.stock <= 0}
-                    onClick={() => handleBuyNow(product)}
+                    onClick={event => {
+                      event.stopPropagation();
+                      handleBuyNow(product);
+                    }}
                   >
                     立即购买
                   </ActionButton>,
@@ -247,7 +289,7 @@ const Home = () => {
                   {product.description || '暂无描述'}
                 </CardDesc>
                 <MetaRow>
-                  <PriceText>¥{product.price.toFixed(2)}</PriceText>
+                  <PriceText>{formatAmount(product.price)}</PriceText>
                   <Tag color={product.status === 'on_sale' ? 'green' : 'default'}>{saleStatusMap[product.status]}</Tag>
                   <Text type={product.stock > 0 ? 'secondary' : 'danger'}>库存 {product.stock}</Text>
                 </MetaRow>
@@ -263,6 +305,7 @@ const Home = () => {
           pageSize={pageSize}
           total={total}
           showSizeChanger
+          pageSizeOptions={[8, 16, 24, 32]}
           onChange={(current, size) => {
             setPage(current);
             setPageSize(size);
@@ -329,7 +372,13 @@ const ProductCard = styled(Card)`
 const Cover = styled.img`
   width: 100%;
   height: 180px;
-  object-fit: cover;
+  object-fit: contain;
+`;
+
+const CoverWrap = styled.div`
+  height: 180px;
+  background: #fafafa;
+  padding: 8px;
 `;
 
 const CardTitle = styled(Title)`

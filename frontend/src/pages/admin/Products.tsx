@@ -3,7 +3,7 @@ import { Button, Cascader, Form, Input, InputNumber, Modal, Select, Space, Table
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { get, post } from '@/utils/request';
-import { saleStatusMap } from '@/utils/dataformat';
+import { formatAmount, saleStatusMap } from '@/utils/dataformat';
 import { buildCategoryCascaderOptions, buildCategoryPathMap, type CategoryNode } from '@/utils/category';
 
 const { Title } = Typography;
@@ -42,7 +42,8 @@ const Products = () => {
   const [status, setStatus] = useState<'on_sale' | 'off_sale' | undefined>(undefined);
   const [keyword, setKeyword] = useState('');
   const [level, setLevel] = useState<number | undefined>(undefined);
-  const [categoryPath, setCategoryPath] = useState<number[]>([]);
+  // 多选分类：每项都是完整级联路径（如 [1, 3, 9]）
+  const [categoryPaths, setCategoryPaths] = useState<number[][]>([]);
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [categoryForm] = Form.useForm<CategoryCreateFormValues>();
@@ -51,7 +52,12 @@ const Products = () => {
   const categoryFilterOptions = useMemo(() => buildCategoryCascaderOptions(categories), [categories]);
   const parentCategoryOptions = useMemo(() => buildCategoryCascaderOptions(categories, 2), [categories]);
 
-  const selectedCategoryId = categoryPath.length > 0 ? categoryPath[categoryPath.length - 1] : undefined;
+  const selectedCategoryIds = useMemo(() => {
+    const leafIds = categoryPaths
+      .map(path => path[path.length - 1])
+      .filter((id): id is number => typeof id === 'number');
+    return Array.from(new Set(leafIds));
+  }, [categoryPaths]);
 
   const fetchCategories = async () => {
     try {
@@ -72,7 +78,21 @@ const Products = () => {
           status,
           keyword: keyword || undefined,
           level,
-          category_id: selectedCategoryId,
+          category_ids: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+        },
+        paramsSerializer: {
+          serialize: params => {
+            const searchParams = new URLSearchParams();
+            Object.entries(params).forEach(([key, value]) => {
+              if (value === undefined || value === null || value === '') return;
+              if (Array.isArray(value)) {
+                value.forEach(item => searchParams.append(key, String(item)));
+                return;
+              }
+              searchParams.append(key, String(value));
+            });
+            return searchParams.toString();
+          },
         },
       });
       setProducts(data.items);
@@ -90,7 +110,7 @@ const Products = () => {
 
   useEffect(() => {
     void fetchProducts();
-  }, [page, pageSize, status, keyword, level, selectedCategoryId]);
+  }, [page, pageSize, status, keyword, level, selectedCategoryIds]);
 
   const createCategory = async () => {
     try {
@@ -168,13 +188,14 @@ const Products = () => {
             <Cascader
               allowClear
               style={{ width: 300 }}
-              placeholder="请选择分类（支持一级/二级/三级）"
+              placeholder="请选择分类（支持多选）"
               options={categoryFilterOptions}
-              changeOnSelect
-              value={categoryPath}
+              multiple
+              value={categoryPaths}
               onChange={value => {
                 setPage(1);
-                setCategoryPath(value as number[]);
+                const nextPaths = ((value as Array<Array<string | number>>) ?? []).map(path => path.map(id => Number(id)));
+                setCategoryPaths(nextPaths);
               }}
             />
           </FilterItem>
@@ -219,7 +240,7 @@ const Products = () => {
             render: (_, row) => (row.category?.id ? categoryPathMap.get(row.category.id)?.[2] ?? '-' : '-'),
             width: 140,
           },
-          { title: '价格', render: (_, row) => `¥${row.price.toFixed(2)}`, width: 120 },
+          { title: '价格', render: (_, row) => formatAmount(row.price), width: 120 },
           { title: '库存', dataIndex: 'stock', width: 90 },
           { title: '热度', dataIndex: 'hot_score', width: 90 },
           {

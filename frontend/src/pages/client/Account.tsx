@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Button, Card, Form, Input, Space, message } from 'antd';
+import { useEffect, useState } from 'react';
+import { Button, Card, Descriptions, Form, Input, Modal, Space, message } from 'antd';
 import styled from 'styled-components';
 import useAuthStore, { type UserInfo } from '@/store/useAuthStore';
 import { get, post, put } from '@/utils/request';
@@ -9,6 +9,94 @@ const Account = () => {
   const { setUser, logout } = useAuthStore();
   const [profileForm] = Form.useForm<{ username: string; email: string; role: string }>();
   const [passwordForm] = Form.useForm<{ current_password: string; new_password: string; confirm_password: string }>();
+
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
+  const fillProfileForm = (data: UserInfo) => {
+    profileForm.setFieldsValue({
+      username: data.username,
+      email: data.email,
+      role: data.role,
+    });
+  };
+
+  const fetchUserInfo = async () => {
+    try {
+      const data = await get<UserInfo>('/auth/me');
+      setUser(data);
+      setUserInfo(data);
+      fillProfileForm(data);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '用户信息加载失败');
+    }
+  };
+
+  useEffect(() => {
+    void fetchUserInfo();
+  }, []);
+
+  const handleStartProfileEdit = () => {
+    if (!userInfo) return;
+    fillProfileForm(userInfo);
+    setProfileEditing(true);
+  };
+
+  const handleCancelProfileEdit = () => {
+    if (userInfo) {
+      fillProfileForm(userInfo);
+    }
+    setProfileEditing(false);
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      const values = await profileForm.validateFields();
+      setProfileSubmitting(true);
+      const data = await put<UserInfo>('/auth/me', {
+        username: values.username.trim(),
+        email: values.email.trim(),
+      });
+      setUser(data);
+      setUserInfo(data);
+      fillProfileForm(data);
+      setProfileEditing(false);
+      message.success('账号信息已更新');
+    } catch (error) {
+      if (error instanceof Error) {
+        message.error(error.message);
+      }
+    } finally {
+      setProfileSubmitting(false);
+    }
+  };
+
+  const handleOpenPasswordModal = () => {
+    passwordForm.resetFields();
+    setPasswordModalOpen(true);
+  };
+
+  const handleChangePassword = async () => {
+    try {
+      const values = await passwordForm.validateFields();
+      setPasswordSubmitting(true);
+      await post('/auth/change-password', {
+        current_password: values.current_password,
+        new_password: values.new_password,
+      });
+      message.success('密码修改成功，请重新登录');
+      logout();
+    } catch (error) {
+      if (error instanceof Error) {
+        message.error(error.message);
+      }
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
 
   const handleLogoutAll = async () => {
     try {
@@ -21,100 +109,83 @@ const Account = () => {
     }
   };
 
-  const fetchUserInfo = async () => {
-    try {
-      const data = await get<UserInfo>('/auth/me');
-      setUser(data);
-      profileForm.setFieldsValue({
-        username: data.username,
-        email: data.email,
-        role: data.role,
-      });
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '用户信息加载失败');
-    }
-  };
-
-  useEffect(() => {
-    void fetchUserInfo();
-  }, []);
-
-  const handleUpdateProfile = async () => {
-    try {
-      const values = await profileForm.validateFields();
-      const data = await put<UserInfo>('/auth/me', {
-        username: values.username.trim(),
-        email: values.email.trim(),
-      });
-      setUser(data);
-      profileForm.setFieldsValue({
-        username: data.username,
-        email: data.email,
-        role: data.role,
-      });
-      message.success('账号信息已更新');
-    } catch (error) {
-      if (error instanceof Error) {
-        message.error(error.message);
-      }
-    }
-  };
-
-  const handleChangePassword = async () => {
-    try {
-      const values = await passwordForm.validateFields();
-      await post('/auth/change-password', {
-        current_password: values.current_password,
-        new_password: values.new_password,
-      });
-      message.success('密码修改成功，请重新登录');
-      logout();
-    } catch (error) {
-      if (error instanceof Error) {
-        message.error(error.message);
-      }
-    }
-  };
-
   return (
     <ContentWrap>
-      <ClientPageHeader title="我的账号信息" fallbackPath="/" />
+      <ClientPageHeader title="我的账号信息" />
 
-      <Card title="账号资料">
-        <Form form={profileForm} layout="vertical">
-          <Form.Item
-            label="用户名"
-            name="username"
-            rules={[
-              { required: true, message: '请输入用户名' },
-              { min: 3, max: 50, message: '用户名长度需在 3-50 之间' },
-              { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名仅支持字母、数字、下划线' },
-            ]}
-          >
-            <Input maxLength={50} />
-          </Form.Item>
-          <Form.Item
-            label="邮箱"
-            name="email"
-            rules={[
-              { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '邮箱格式不正确' },
-            ]}
-          >
-            <Input maxLength={100} />
-          </Form.Item>
-          <Form.Item label="角色（不可修改）" name="role">
-            <Input disabled />
-          </Form.Item>
-          <Space>
-            <Button type="primary" onClick={() => void handleUpdateProfile()}>
-              保存账号信息
+      <Card
+        title="账号资料"
+        extra={
+          profileEditing ? null : (
+            <Button type="primary" onClick={handleStartProfileEdit}>
+              编辑资料
             </Button>
-          </Space>
-        </Form>
+          )
+        }
+      >
+        {profileEditing ? (
+          <Form form={profileForm} layout="vertical">
+            <Form.Item
+              label="用户名"
+              name="username"
+              rules={[
+                { required: true, message: '请输入用户名' },
+                { min: 3, max: 50, message: '用户名长度需在 3-50 之间' },
+                { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名仅支持字母、数字、下划线' },
+              ]}
+            >
+              <Input maxLength={50} />
+            </Form.Item>
+            <Form.Item
+              label="邮箱"
+              name="email"
+              rules={[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '邮箱格式不正确' },
+              ]}
+            >
+              <Input maxLength={100} />
+            </Form.Item>
+            <Form.Item label="角色（不可修改）" name="role">
+              <Input disabled />
+            </Form.Item>
+            <Space>
+              <Button type="primary" loading={profileSubmitting} onClick={() => void handleUpdateProfile()}>
+                保存
+              </Button>
+              <Button onClick={handleCancelProfileEdit}>取消</Button>
+            </Space>
+          </Form>
+        ) : (
+          <Descriptions column={1} bordered size="middle">
+            <Descriptions.Item label="用户名">{userInfo?.username ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="邮箱">{userInfo?.email ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="角色">{userInfo?.role ?? '-'}</Descriptions.Item>
+          </Descriptions>
+        )}
       </Card>
 
-      <Card title="修改密码" style={{ marginTop: 16 }}>
+      <Card title="账号安全" style={{ marginTop: 16 }}>
+        <Space>
+          <Button danger type="primary" onClick={handleOpenPasswordModal}>
+            修改密码
+          </Button>
+          <Button danger onClick={handleLogoutAll}>
+            退出所有设备
+          </Button>
+        </Space>
+      </Card>
+
+      <Modal
+        title="修改密码"
+        open={passwordModalOpen}
+        onOk={() => void handleChangePassword()}
+        onCancel={() => setPasswordModalOpen(false)}
+        okText="确认修改"
+        cancelText="取消"
+        okButtonProps={{ danger: true, loading: passwordSubmitting }}
+        destroyOnClose
+      >
         <Form form={passwordForm} layout="vertical">
           <Form.Item label="当前密码" name="current_password" rules={[{ required: true, message: '请输入当前密码' }]}>
             <Input.Password maxLength={20} />
@@ -148,16 +219,8 @@ const Account = () => {
           >
             <Input.Password maxLength={20} />
           </Form.Item>
-          <Space>
-            <Button type="primary" danger onClick={() => void handleChangePassword()}>
-              修改密码并重新登录
-            </Button>
-            <Button danger onClick={handleLogoutAll}>
-              退出所有设备
-            </Button>
-          </Space>
         </Form>
-      </Card>
+      </Modal>
     </ContentWrap>
   );
 };

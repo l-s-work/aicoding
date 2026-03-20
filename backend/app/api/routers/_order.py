@@ -156,6 +156,40 @@ async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     return order
 
 
+@router.post("/{order_id}/confirm-receipt", response_model=OrderResponse)
+async def confirm_order_receipt(order_id: int, db: DatabaseSession, current_user: CurrentUser):
+    """
+    用户确认收货
+
+    - 仅已发货订单允许确认收货
+    - 确认后状态改为 completed
+    """
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id, Order.user_id == current_user.id)
+        .options(selectinload(Order.items), selectinload(Order.user))
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="订单不存在"
+        )
+    if order.status != "shipped":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="只有已发货订单可以确认收货"
+        )
+
+    order.status = "completed"
+    order.updated_at = datetime.utcnow().isoformat()
+    await db.commit()
+    await db.refresh(order)
+
+    _attach_username(order)
+    return order
+
+
 @router.post("/{order_id}/cancel", response_model=OrderResponse)
 async def cancel_order(order_id: int, db: DatabaseSession, current_user: CurrentUser):
     """
@@ -265,8 +299,8 @@ async def update_order_status(
     管理员更新订单状态
     
     - 发货: paid → shipped
-    - 完成: shipped → completed
-    - 终止: * → cancelled
+    - 已完成状态只能由用户确认收货触发
+    - 已完成订单禁止再次修改
     """
     result = await db.execute(
         select(Order)
@@ -280,7 +314,20 @@ async def update_order_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="订单不存在"
         )
-    
+
+    # 已完成订单禁止二次修改
+    if order.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已完成订单不允许修改状态"
+        )
+    # “已完成”应由用户确认收货触发，管理员不可直接设置
+    if status_data.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已完成状态需由用户确认收货触发"
+        )
+
     order.status = status_data.status
     order.updated_at = datetime.utcnow().isoformat()
     

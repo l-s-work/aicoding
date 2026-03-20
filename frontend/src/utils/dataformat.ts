@@ -10,3 +10,15 @@ export const orderStatusMap: Record<string, string> = {
   completed: '已完成',
   cancelled: '已取消',
 };
+
+/**
+ * 金额格式化：统一两位小数 + 千分位
+ * 示例：1234567.8 -> ¥1,234,567.80
+ */
+export const formatAmount = (amount: number): string => {
+  const normalized = Number.isFinite(amount) ? amount : 0;
+  return `¥${normalized.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};

@@ -83,3 +83,37 @@ class DashboardStatsResponse(BaseModel):
     status_distribution: list[ProductStatusCount]
     top_categories: list[CategoryProductCount]
     top_hot_products: list[HotProductItem]
+
+
+class RecoveryRequestResponse(BaseModel):
+    """账号恢复申请响应"""
+    id: int
+    user_id: int
+    username: str
+    reason: str
+    status: str
+    admin_note: str | None = None
+    created_at: str
+    processed_at: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class RecoveryRequestListResponse(BaseModel):
+    """账号恢复申请列表响应"""
+    total: int
+    items: list[RecoveryRequestResponse]
+
+
+class RecoveryRequestProcessRequest(BaseModel):
+    """管理员处理恢复申请"""
+    status: str = Field(description="approved/rejected")
+    admin_note: str | None = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in ("approved", "rejected"):
+            raise ValueError("status 只能是 approved 或 rejected")
+        return v

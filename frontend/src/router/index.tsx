@@ -16,6 +16,7 @@ const ClientAppLayout = lazy(() => import('@/components/Layout/ClientAppLayout')
 
 // ===== 懒加载：B端页面（打包时独立 Chunk，不发给普通买家） =====
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
+const AdminTodos = lazy(() => import('@/pages/admin/Todos'));
 const AdminProducts = lazy(() => import('@/pages/admin/Products'));
 const AdminProductEditor = lazy(() => import('@/pages/admin/ProductEditor'));
 const AdminOrders = lazy(() => import('@/pages/admin/Orders'));
@@ -168,6 +169,14 @@ const router = createBrowserRouter([
             element: (
               <Suspense fallback={<PageFallback />}>
                 <AdminDashboard />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'todos',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <AdminTodos />
               </Suspense>
             ),
           },

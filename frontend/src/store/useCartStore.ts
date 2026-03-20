@@ -10,13 +10,17 @@ export interface CartItem {
   cover: string;
   /** 加入购物车时的当前售价快照（防止价格变动影响展示） */
   price: number;
+  /**
+   * 购物车不再统计数量，统一在结算页选择数量。
+   * 该字段保留用于兼容历史持久化数据与结算页初始化，固定为 1。
+   */
   quantity: number;
 }
 
 interface CartState {
   items: CartItem[];
-  /** 加入购物车，已存在则累加数量 */
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  /** 加入购物车，已存在则忽略（不重复累计数量） */
+  addItem: (item: Omit<CartItem, 'quantity'>) => boolean;
   /** 更新指定商品数量（设为 0 则等同于移除） */
   updateQuantity: (productId: number, quantity: number) => void;
   /** 移除单个商品 */
@@ -42,12 +46,11 @@ const useCartStore = create<CartState>()(
       addItem: newItem => {
         const exists = get().items.find(i => i.productId === newItem.productId);
         if (exists) {
-          // 已存在则增加数量
-          set({
-            items: get().items.map(i => (i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i)),
-          });
+          // 购物车按“商品集合”管理，已存在则不重复添加
+          return false;
         } else {
           set({ items: [...get().items, { ...newItem, quantity: 1 }] });
+          return true;
         }
       },
 
@@ -68,9 +71,11 @@ const useCartStore = create<CartState>()(
 
       clearCart: () => set({ items: [] }),
 
-      totalPrice: () => get().items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      // 购物车阶段不统计数量，统一按 1 件展示金额；结算页再按用户选择数量计算
+      totalPrice: () => get().items.reduce((sum, item) => sum + item.price, 0),
 
-      totalCount: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
+      // 购物车数量角标按“商品种类数”统计
+      totalCount: () => get().items.length,
     }),
     {
       name: 'cart-storage', // localStorage key

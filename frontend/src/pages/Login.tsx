@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Form, Input, Button, message } from 'antd';
+import { useEffect, useState } from 'react';
+import { Form, Input, Button, Modal, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import styled from 'styled-components';
@@ -21,6 +21,10 @@ interface LoginResponse {
     email: string;
     role: 'client' | 'admin';
   };
+}
+
+interface RecoveryRequestFormValues {
+  reason: string;
 }
 
 /** 根据用户角色安全地计算登录后跳转路径，避免 admin 被回跳到 C 端路由触发 403 */
@@ -63,6 +67,24 @@ const Login = () => {
   const location = useLocation();
   const { login } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [showRecoveryAction, setShowRecoveryAction] = useState(false);
+  const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
+  const [recoverySubmitting, setRecoverySubmitting] = useState(false);
+  const [lastAttemptUsername, setLastAttemptUsername] = useState('');
+  const [recoveryForm] = Form.useForm<RecoveryRequestFormValues>();
+
+  useEffect(() => {
+    // 被系统联锁清退到登录页时，自动展示恢复申请入口
+    const search = new URLSearchParams(location.search);
+    const reason = search.get('reason');
+    if (reason === 'banned') {
+      setShowRecoveryAction(true);
+      const savedUsername = sessionStorage.getItem('recovery-username') ?? '';
+      if (savedUsername) {
+        setLastAttemptUsername(savedUsername);
+      }
+    }
+  }, [location.search]);
 
   // 获取登录前用户尝试访问的页面（从 PrivateRoute 传递的 state）
   const from = (location.state as { from?: string })?.from;
@@ -74,6 +96,8 @@ const Login = () => {
    */
   const handleSubmit = async (values: LoginRequest) => {
     setLoading(true);
+    setLastAttemptUsername(values.username.trim());
+    setShowRecoveryAction(false);
 
     try {
       const response = await post<LoginResponse>('/auth/login', values);
@@ -88,9 +112,43 @@ const Login = () => {
       navigate(targetPath, { replace: true });
     } catch (error) {
       // 后端错误信息已通过 Axios 拦截器处理，直接展示
-      message.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
+      const errorMessage = error instanceof Error ? error.message : '登录失败，请稍后重试';
+      message.error(errorMessage);
+      if (errorMessage.includes('封禁')) {
+        setShowRecoveryAction(true);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenRecoveryModal = () => {
+    if (!lastAttemptUsername) {
+      message.warning('请先输入用户名并尝试登录后再申请恢复');
+      return;
+    }
+    recoveryForm.resetFields();
+    setRecoveryModalOpen(true);
+  };
+
+  const handleSubmitRecovery = async () => {
+    try {
+      const values = await recoveryForm.validateFields();
+      setRecoverySubmitting(true);
+      await post('/auth/recovery-request', {
+        username: lastAttemptUsername,
+        reason: values.reason.trim(),
+      });
+      message.success('恢复申请已提交，请等待管理员处理');
+      sessionStorage.removeItem('recovery-username');
+      setRecoveryModalOpen(false);
+      setShowRecoveryAction(false);
+    } catch (error) {
+      if (error instanceof Error) {
+        message.error(error.message);
+      }
+    } finally {
+      setRecoverySubmitting(false);
     }
   };
 
@@ -143,6 +201,14 @@ const Login = () => {
               登录
             </LoginButton>
           </Form.Item>
+
+          {showRecoveryAction ? (
+            <Form.Item>
+              <Button block onClick={handleOpenRecoveryModal}>
+                账号被封禁，申请恢复
+              </Button>
+            </Form.Item>
+          ) : null}
         </Form>
 
         {/* 开发期提示信息 */}
@@ -152,6 +218,32 @@ const Login = () => {
           <p>⚠️ 连续登录失败 5 次将锁定 10 分钟</p>
         </DevHint>
       </LoginCard>
+
+      <Modal
+        title="账号恢复申请"
+        open={recoveryModalOpen}
+        onOk={() => void handleSubmitRecovery()}
+        onCancel={() => setRecoveryModalOpen(false)}
+        okText="提交申请"
+        cancelText="取消"
+        okButtonProps={{ loading: recoverySubmitting }}
+      >
+        <Form form={recoveryForm} layout="vertical">
+          <Form.Item label="申请账号">
+            <Input value={lastAttemptUsername} disabled />
+          </Form.Item>
+          <Form.Item
+            label="申请原因"
+            name="reason"
+            rules={[
+              { required: true, message: '请填写申请原因' },
+              { min: 5, max: 500, message: '申请原因长度需在 5-500 字之间' },
+            ]}
+          >
+            <Input.TextArea rows={4} maxLength={500} showCount placeholder="请描述账号恢复申请原因，便于管理员审核" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </LoginContainer>
   );
 };

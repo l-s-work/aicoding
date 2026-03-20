@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
 import styled from 'styled-components';
-import { get } from '@/utils/request';
-import { orderStatusMap } from '@/utils/dataformat';
+import dayjs from 'dayjs';
+import { get, post } from '@/utils/request';
+import { formatAmount, orderStatusMap } from '@/utils/dataformat';
 import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 
 const { Text } = Typography;
@@ -71,9 +72,19 @@ const Orders = () => {
     void fetchOrders();
   }, [page, pageSize, status, productName]);
 
+  const handleConfirmReceipt = async (orderId: number) => {
+    try {
+      await post(`/orders/${orderId}/confirm-receipt`);
+      message.success('确认收货成功，订单已完成');
+      await fetchOrders();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '确认收货失败');
+    }
+  };
+
   return (
     <ContentWrap>
-      <ClientPageHeader title="我的订单" fallbackPath="/" />
+      <ClientPageHeader title="我的订单" />
       <FilterRow wrap style={{ marginBottom: 14 }}>
         <FilterItem>
           <FilterLabel>关键词</FilterLabel>
@@ -128,18 +139,28 @@ const Orders = () => {
             title: '商品',
             render: (_, row) => row.items.map(item => item.product_name).slice(0, 2).join(' / '),
           },
-          { title: '金额', render: (_, row) => `¥${row.total_amount.toFixed(2)}` },
+          { title: '金额', render: (_, row) => formatAmount(row.total_amount) },
           {
             title: '状态',
             render: (_, row) => <Tag color={statusColorMap[row.status] ?? 'default'}>{orderStatusMap[row.status] ?? row.status}</Tag>,
           },
-          { title: '下单时间', dataIndex: 'created_at' },
+          {
+            title: '下单时间',
+            render: (_, row) => dayjs(row.created_at).format('YYYY-MM-DD HH:mm:ss'),
+          },
           {
             title: '操作',
             render: (_, row) => (
-              <Button type="link" onClick={() => navigate(`/orders/${row.id}`)}>
-                查看详情
-              </Button>
+              <Space size={0}>
+                <Button type="link" onClick={() => navigate(`/orders/${row.id}`)}>
+                  查看详情
+                </Button>
+                {row.status === 'shipped' ? (
+                  <Button type="link" onClick={() => void handleConfirmReceipt(row.id)}>
+                    确认收货
+                  </Button>
+                ) : null}
+              </Space>
             ),
           },
         ]}

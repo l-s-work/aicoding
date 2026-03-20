@@ -31,6 +31,12 @@ class User(Base):
     addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="user")
     chat_messages = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
+    recovery_requests = relationship(
+        "AccountRecoveryRequest",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="AccountRecoveryRequest.user_id",
+    )
 
 
 class RefreshToken(Base):
@@ -53,6 +59,24 @@ class AccessTokenBlocklist(Base):
     jti = Column(String(64), unique=True, nullable=False, index=True)
     expires_at = Column(String(50), nullable=False)  # ISO格式
     created_at = Column(String(50), default=lambda: datetime.utcnow().isoformat())
+
+
+class AccountRecoveryRequest(Base):
+    """账号恢复申请表（用于封禁用户发起解封申请）"""
+    __tablename__ = "account_recovery_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    username = Column(String(50), nullable=False, index=True)
+    reason = Column(String(500), nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending/approved/rejected
+    admin_note = Column(String(500), nullable=True)
+    processed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(String(50), default=lambda: datetime.utcnow().isoformat(), index=True)
+    processed_at = Column(String(50), nullable=True)
+
+    # 关系映射
+    user = relationship("User", foreign_keys=[user_id], back_populates="recovery_requests")
 
 
 class ProductCategory(Base):

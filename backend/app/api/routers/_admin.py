@@ -1,11 +1,12 @@
 """
 管理员路由：Dashboard 统计、用户管理
 """
+from datetime import datetime
 from sqlalchemy import select, func, and_, or_
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentAdmin, DatabaseSession
-from app.db.models import Product, ProductCategory, User
+from app.db.models import Product, ProductCategory, User, AccountRecoveryRequest
 from app.core.security import hash_password
 from app.schemas.admin_schema import (
     AdminUserListResponse,
@@ -16,6 +17,9 @@ from app.schemas.admin_schema import (
     ProductStatusCount,
     CategoryProductCount,
     HotProductItem,
+    RecoveryRequestListResponse,
+    RecoveryRequestResponse,
+    RecoveryRequestProcessRequest,
 )
 
 router = APIRouter(prefix="/admin", tags=["管理员"])
@@ -167,3 +171,60 @@ async def reset_user_password(
     # 重置密码后踢下线所有会话
     user.token_version += 1
     await db.commit()
+
+
+@router.get("/recovery-requests", response_model=RecoveryRequestListResponse)
+async def get_recovery_requests(
+    db: DatabaseSession,
+    admin: CurrentAdmin,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: str | None = Query(None, alias="status", description="pending/approved/rejected"),
+):
+    """管理员查看账号恢复申请列表"""
+    query = select(AccountRecoveryRequest)
+    if status_filter in ("pending", "approved", "rejected"):
+        query = query.where(AccountRecoveryRequest.status == status_filter)
+
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+    offset = (page - 1) * page_size
+    rows = await db.execute(
+        query.order_by(AccountRecoveryRequest.created_at.desc()).offset(offset).limit(page_size)
+    )
+    requests = rows.scalars().all()
+    return RecoveryRequestListResponse(total=total, items=[RecoveryRequestResponse.model_validate(item) for item in requests])
+
+
+@router.put("/recovery-requests/{request_id}/process", response_model=RecoveryRequestResponse)
+async def process_recovery_request(
+    request_id: int,
+    payload: RecoveryRequestProcessRequest,
+    db: DatabaseSession,
+    admin: CurrentAdmin,
+):
+    """管理员处理账号恢复申请（通过/驳回）"""
+    request_record = (
+        await db.execute(select(AccountRecoveryRequest).where(AccountRecoveryRequest.id == request_id))
+    ).scalar_one_or_none()
+    if not request_record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="恢复申请不存在")
+    if request_record.status != "pending":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该申请已处理")
+
+    request_record.status = payload.status
+    request_record.admin_note = payload.admin_note.strip() if payload.admin_note else None
+    request_record.processed_by = admin.id
+    request_record.processed_at = datetime.utcnow().isoformat()
+
+    if payload.status == "approved":
+        user = (await db.execute(select(User).where(User.id == request_record.user_id))).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="申请关联用户不存在")
+        user.is_active = 1
+        user.failed_login_attempts = 0
+        user.lockout_until = None
+        user.token_version += 1
+
+    await db.commit()
+    await db.refresh(request_record)
+    return RecoveryRequestResponse.model_validate(request_record)
