@@ -3,6 +3,7 @@ AI 服务层：OpenAI 集成、向量计算、智能推荐
 """
 import json
 import hashlib
+import logging
 from typing import Optional
 
 import numpy as np
@@ -13,10 +14,19 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.db.models import Product, ProductEmbedding, ChatMessage
 
-# 初始化 OpenAI 客户端（支持自定义 base_url）
-client = AsyncOpenAI(
+# 日志记录器
+logger = logging.getLogger(__name__)
+
+# 聊天客户端：保持现有 OPENAI_* 配置，不影响原有对话能力
+chat_client = AsyncOpenAI(
     api_key=settings.OPENAI_API_KEY,
     base_url=settings.OPENAI_BASE_URL
+)
+
+# Embedding 客户端：优先使用千问配置，对接 qwen3-vl-embedding
+embedding_client = AsyncOpenAI(
+    api_key=settings.embedding_api_key,
+    base_url=settings.embedding_base_url
 )
 
 
@@ -28,12 +38,23 @@ async def generate_embedding(text: str) -> list[float]:
         text: 输入文本
         
     Returns:
-        1536 维向量
+        由具体 Embedding 模型决定的向量
     """
-    response = await client.embeddings.create(
-        model=settings.OPENAI_EMBEDDING_MODEL,
-        input=text
-    )
+    normalized_text = text.strip()
+    if not normalized_text:
+        raise ValueError("Embedding 输入文本不能为空")
+
+    try:
+        response = await embedding_client.embeddings.create(
+            model=settings.embedding_model,
+            input=normalized_text
+        )
+    except Exception as exc:
+        logger.exception("Embedding 调用失败，model=%s", settings.embedding_model)
+        raise RuntimeError("Embedding 服务调用失败，请检查模型配置或 API Key") from exc
+
+    if not response.data or not response.data[0].embedding:
+        raise RuntimeError("Embedding 服务返回空向量")
     
     return response.data[0].embedding
 
@@ -118,7 +139,7 @@ async def search_similar_products(
     """
     # 生成查询向量
     query_vector = await generate_embedding(query)
-    query_array = np.array(query_vector)
+    query_array = np.array(query_vector, dtype=np.float32)
     
     # 查询所有在售商品的向量
     stmt = (
@@ -137,9 +158,21 @@ async def search_similar_products(
     similarities = []
     
     for product, embedding in rows:
-        # 解析向量
-        product_vector = json.loads(embedding.embedding)
-        product_array = np.array(product_vector)
+        try:
+            # 解析向量
+            product_vector = json.loads(embedding.embedding)
+            product_array = np.array(product_vector, dtype=np.float32)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            logger.warning("商品 %s 的 embedding 数据损坏，已跳过", product.id)
+            continue
+
+        # 切模型后可能存在历史向量维度不一致，直接跳过避免计算报错
+        if product_array.shape != query_array.shape:
+            logger.info(
+                "商品 %s 向量维度不匹配，query=%s, product=%s，已跳过",
+                product.id, query_array.shape, product_array.shape
+            )
+            continue
         
         # 余弦相似度
         denominator = np.linalg.norm(query_array) * np.linalg.norm(product_array)
@@ -244,7 +277,7 @@ async def generate_streaming_response(messages: list[dict]):
     Yields:
         SSE 格式的数据块
     """
-    stream = await client.chat.completions.create(
+    stream = await chat_client.chat.completions.create(
         model=settings.OPENAI_MODEL,
         messages=messages,
         stream=True,
