@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, List
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Query, UploadFile, File
 from sqlalchemy import select, func, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -17,6 +17,7 @@ from app.schemas.product_schema import (
     ProductCreate, ProductUpdate, ProductResponse, ProductListResponse,
     CategoryCreate, CategoryResponse, CategoryTreeResponse
 )
+from app.services.ai_service import trigger_product_embedding_sync, upsert_embedding_status
 
 router = APIRouter(prefix="/products", tags=["商品"])
 PRODUCT_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads" / "products"
@@ -251,13 +252,17 @@ async def get_categories(
 
 # ==================== 商品管理 ====================
 
-async def _get_product_with_category(db: DatabaseSession, product_id: int) -> Product:
+async def _get_product_with_related(db: DatabaseSession, product_id: int) -> Product:
     """
-    按 ID 查询商品并预加载分类，避免响应序列化阶段触发异步懒加载。
+    按 ID 查询商品并预加载分类/向量状态，避免响应序列化阶段触发异步懒加载。
     """
     result = await db.execute(
         select(Product)
-        .options(selectinload(Product.category))
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.embedding),
+            selectinload(Product.embedding_status_record),
+        )
         .where(Product.id == product_id)
     )
     product = result.scalar_one_or_none()
@@ -269,7 +274,12 @@ async def _get_product_with_category(db: DatabaseSession, product_id: int) -> Pr
     return product
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-async def create_product(product_data: ProductCreate, db: DatabaseSession, admin: CurrentAdmin):
+async def create_product(
+    product_data: ProductCreate,
+    background_tasks: BackgroundTasks,
+    db: DatabaseSession,
+    admin: CurrentAdmin
+):
     """创建商品 (仅管理员)"""
     # 验证分类存在性：商品必须挂在三级分类节点（叶子节点）
     if product_data.category_id:
@@ -293,13 +303,14 @@ async def create_product(product_data: ProductCreate, db: DatabaseSession, admin
     
     db.add(product)
     await db.commit()
-    # 创建后重新查询并预加载 category，避免 FastAPI 响应校验时触发懒加载报错
-    product_with_category = await _get_product_with_category(db, product.id)
-    
-    # TODO: 异步生成 Embedding (后台任务)
-    # 这里可以使用 FastAPI 的 BackgroundTasks 来异步生成向量
-    
-    return product_with_category
+
+    # 创建商品后立即打上“待向量化”状态，再交给后台任务执行
+    await upsert_embedding_status(db, product_id=product.id, status="pending")
+    await db.commit()
+    background_tasks.add_task(trigger_product_embedding_sync, product.id, False)
+
+    # 创建后重新查询并预加载 category/embedding 状态，避免响应校验阶段触发懒加载
+    return await _get_product_with_related(db, product.id)
 
 
 @router.post("/upload-image")
@@ -376,7 +387,11 @@ async def get_products(
     注意：选择一级或二级分类时，会自动包含其所有子分类的商品
     """
     # 构建查询
-    query = select(Product).options(selectinload(Product.category))  # 预加载分类
+    query = select(Product).options(
+        selectinload(Product.category),
+        selectinload(Product.embedding),
+        selectinload(Product.embedding_status_record),
+    )
     
     # 分类筛选（支持级联查询）
     selected_category_ids = set(category_ids or [])
@@ -447,7 +462,11 @@ async def get_product(product_id: int, db: DatabaseSession):
     """获取商品详情（包含完整分类信息）"""
     result = await db.execute(
         select(Product)
-        .options(selectinload(Product.category))  # 预加载分类数据
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.embedding),
+            selectinload(Product.embedding_status_record),
+        )  # 预加载分类与向量状态数据
         .where(Product.id == product_id)
     )
     product = result.scalar_one_or_none()
@@ -465,6 +484,7 @@ async def get_product(product_id: int, db: DatabaseSession):
 async def update_product(
     product_id: int,
     product_data: ProductUpdate,
+    background_tasks: BackgroundTasks,
     db: DatabaseSession,
     admin: CurrentAdmin
 ):
@@ -499,18 +519,43 @@ async def update_product(
 
     # 更新字段 (仅更新提供的字段)
     update_data = product_data.model_dump(exclude_unset=True)
+    should_resync_embedding = any(field in update_data for field in {"name", "description"})
     for field, value in update_data.items():
         setattr(product, field, value)
     
     product.updated_at = datetime.utcnow().isoformat()
     
     await db.commit()
-    # 更新后重新查询并预加载 category，避免响应阶段触发异步懒加载
-    product_with_category = await _get_product_with_category(db, product.id)
-    
-    # TODO: 如果名称或描述变更，需重新生成 Embedding
-    
-    return product_with_category
+
+    if should_resync_embedding:
+        await upsert_embedding_status(db, product_id=product.id, status="pending")
+        await db.commit()
+        background_tasks.add_task(trigger_product_embedding_sync, product.id, False)
+
+    # 更新后重新查询并预加载 category/embedding 状态，避免响应阶段触发异步懒加载
+    return await _get_product_with_related(db, product.id)
+
+
+@router.post("/{product_id}/embedding/sync", status_code=status.HTTP_202_ACCEPTED)
+async def sync_product_embedding_manually(
+    product_id: int,
+    background_tasks: BackgroundTasks,
+    db: DatabaseSession,
+    admin: CurrentAdmin
+):
+    """
+    手动重新同步商品向量（仅管理员）。
+
+    - 适合后台商品管理中的“失败重试”
+    - 采用后台任务执行，避免管理员页面长时间等待
+    """
+    await _get_product_with_related(db, product_id)
+
+    await upsert_embedding_status(db, product_id=product_id, status="pending")
+    await db.commit()
+
+    background_tasks.add_task(trigger_product_embedding_sync, product_id, True)
+    return {"message": "已加入后台向量化队列"}
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

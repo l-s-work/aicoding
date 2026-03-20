@@ -1,8 +1,9 @@
 """
 商品相关 Pydantic Schemas
 """
+from typing import Literal, Optional
+
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional
 
 
 class CategoryBase(BaseModel):
@@ -108,6 +109,7 @@ class ProductResponse(ProductBase):
     created_at: str
     updated_at: Optional[str] = None
     category: Optional[CategoryResponse] = None  # 嵌套分类完整信息
+    embedding_status: "ProductEmbeddingStatusResponse"
     
     class Config:
         from_attributes = True
@@ -119,4 +121,14 @@ class ProductListResponse(BaseModel):
     items: list[ProductResponse]
 
 
+class ProductEmbeddingStatusResponse(BaseModel):
+    """商品向量化状态响应"""
+    status: Literal["not_synced", "pending", "success", "failed"]
+    has_vector: bool = False
+    last_error: Optional[str] = None
+    updated_at: Optional[str] = None
+    last_success_at: Optional[str] = None
+
+
 CategoryTreeResponse.model_rebuild()
+ProductResponse.model_rebuild()

@@ -116,7 +116,41 @@ class Product(Base):
     # 关系映射
     category = relationship("ProductCategory", back_populates="products")
     embedding = relationship("ProductEmbedding", uselist=False, back_populates="product", cascade="all, delete-orphan")
+    embedding_status_record = relationship(
+        "ProductEmbeddingStatus",
+        uselist=False,
+        back_populates="product",
+        cascade="all, delete-orphan"
+    )
     order_items = relationship("OrderItem", back_populates="product")
+
+    @property
+    def embedding_status(self) -> dict:
+        """
+        商品向量化状态聚合视图。
+        这里使用属性而不是直接展开数据库字段，便于兼容老数据：
+        - 老商品如果已有 embedding 但还没有状态记录，仍视为 success
+        - 新商品若尚未生成向量，则返回 not_synced
+        """
+        has_vector = self.embedding is not None
+        status_record = self.embedding_status_record
+
+        if status_record:
+            return {
+                "status": status_record.status,
+                "has_vector": has_vector,
+                "last_error": status_record.last_error,
+                "updated_at": status_record.updated_at,
+                "last_success_at": status_record.last_success_at,
+            }
+
+        return {
+            "status": "success" if has_vector else "not_synced",
+            "has_vector": has_vector,
+            "last_error": None,
+            "updated_at": self.embedding.updated_at if has_vector else None,
+            "last_success_at": self.embedding.updated_at if has_vector else None,
+        }
 
 
 class ProductEmbedding(Base):
@@ -130,6 +164,21 @@ class ProductEmbedding(Base):
     
     # 关系映射
     product = relationship("Product", back_populates="embedding")
+
+
+class ProductEmbeddingStatus(Base):
+    """商品向量化状态表"""
+    __tablename__ = "product_embedding_statuses"
+
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    status = Column(String(20), nullable=False, default="not_synced")  # not_synced / pending / success / failed
+    last_error = Column(String(500), nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    updated_at = Column(String(50), default=lambda: datetime.utcnow().isoformat())
+    last_success_at = Column(String(50), nullable=True)
+
+    # 关系映射
+    product = relationship("Product", back_populates="embedding_status_record")
 
 
 class UserAddress(Base):

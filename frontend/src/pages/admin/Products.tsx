@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Cascader, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Cascader, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { get, post } from '@/utils/request';
@@ -17,6 +18,13 @@ interface ProductItem {
   hot_score: number;
   image_url?: string | null;
   category?: { id: number; name: string; level: number };
+  embedding_status: {
+    status: 'not_synced' | 'pending' | 'success' | 'failed';
+    has_vector: boolean;
+    last_error?: string | null;
+    updated_at?: string | null;
+    last_success_at?: string | null;
+  };
 }
 
 interface ProductListResponse {
@@ -38,6 +46,7 @@ const Products = () => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [syncingIds, setSyncingIds] = useState<number[]>([]);
 
   const [status, setStatus] = useState<'on_sale' | 'off_sale' | undefined>(undefined);
   const [keyword, setKeyword] = useState('');
@@ -131,6 +140,43 @@ const Products = () => {
     }
   };
 
+  const handleSyncEmbedding = async (productId: number) => {
+    setSyncingIds(prev => (prev.includes(productId) ? prev : [...prev, productId]));
+    try {
+      const response = await post<{ message: string }>(`/products/${productId}/embedding/sync`);
+      message.success(response.message || '已加入后台向量化队列');
+      await fetchProducts();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '重新向量化失败');
+    } finally {
+      setSyncingIds(prev => prev.filter(id => id !== productId));
+    }
+  };
+
+  const handleRefreshProducts = async () => {
+    await fetchProducts();
+    message.success('商品列表已刷新');
+  };
+
+  const renderEmbeddingStatus = (row: ProductItem) => {
+    const { embedding_status: embeddingStatus } = row;
+    const statusConfigMap: Record<ProductItem['embedding_status']['status'], { color: string; label: string }> = {
+      not_synced: { color: 'default', label: '未生成' },
+      pending: { color: 'processing', label: '处理中' },
+      success: { color: 'green', label: '成功' },
+      failed: { color: 'red', label: '失败' },
+    };
+    const statusConfig = statusConfigMap[embeddingStatus.status];
+
+    return (
+      <Space direction="vertical" size={2}>
+          <Tooltip title={embeddingStatus.last_error ? embeddingStatus.last_error :''}>
+            <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
+          </Tooltip>
+      </Space>
+    );
+  };
+
   return (
     <ContentWrap>
       <Title level={3}>商品管理</Title>
@@ -201,6 +247,9 @@ const Products = () => {
           </FilterItem>
         </FilterRow>
         <Space>
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void handleRefreshProducts()}>
+            刷新列表
+          </Button>
           <Button onClick={() => setCategoryModalOpen(true)}>新建分类</Button>
           <Button type="primary" onClick={() => navigate('/admin/products/new')}>
             新建商品
@@ -223,8 +272,8 @@ const Products = () => {
           },
         }}
         columns={[
-          { title: 'ID', dataIndex: 'id', width: 80 },
-          { title: '商品名称', dataIndex: 'name', width: 220 },
+          { title: 'ID', dataIndex: 'id', width: 80,fixed: 'left' },
+          { title: '商品名称', dataIndex: 'name', width: 220,fixed: 'left' },
           {
             title: '一级分类',
             render: (_, row) => (row.category?.id ? categoryPathMap.get(row.category.id)?.[0] ?? '-' : '-'),
@@ -249,16 +298,34 @@ const Products = () => {
             render: (_, row) => <Tag color={row.status === 'on_sale' ? 'green' : 'default'}>{saleStatusMap[row.status]}</Tag>,
           },
           {
+            title: '向量状态',
+            width: 100,
+            fixed: 'right',
+            render: (_, row) => renderEmbeddingStatus(row),
+          },
+          {
             title: '操作',
-            width: 120,
+            width: 220,
+            fixed: 'right',
+            align: 'left',
             render: (_, row) => (
-              <Button type="link" onClick={() => navigate(`/admin/products/${row.id}/edit`)}>
-                编辑
-              </Button>
+                <Space size={4}>
+                  <Button type="link" onClick={() => navigate(`/admin/products/${row.id}/edit`)}>
+                    编辑
+                  </Button>
+                  <Button
+                    type="link"
+                    loading={syncingIds.includes(row.id)}
+                    disabled={row.embedding_status.status === 'pending'}
+                    onClick={() => void handleSyncEmbedding(row.id)}
+                  >
+                    {row.embedding_status.status === 'not_synced' ? '生成向量' : '重新向量化'}
+                  </Button>
+                </Space>
             ),
           },
         ]}
-        scroll={{ x: 1280 }}
+        scroll={{ x: 1520 }}
       />
 
       <Modal
@@ -317,5 +384,6 @@ const FilterLabel = styled.span`
   color: #595959;
   white-space: nowrap;
 `;
+
 
 export default Products;

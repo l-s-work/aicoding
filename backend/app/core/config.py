@@ -2,6 +2,8 @@
 核心配置模块
 使用 Pydantic Settings 读取环境变量
 """
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +33,8 @@ class Settings(BaseSettings):
     QWEN_API_KEY: str = ""
     QWEN_EMBEDDING_MODEL: str = "qwen3-vl-embedding"
     QWEN_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    QWEN_MULTIMODAL_EMBEDDING_URL: str = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding"
+    QWEN_EMBEDDING_DIMENSION: Optional[int] = 1024
     
     # CORS 配置
     CORS_ORIGINS: str = "http://localhost:5174"
