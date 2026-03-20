@@ -14,7 +14,7 @@ from app.api.deps import DatabaseSession, CurrentUser
 from app.db.models import User, RefreshToken, AccessTokenBlocklist
 from app.schemas.auth_schema import (
     UserRegister, UserLogin, ForgotPasswordRequest, TokenResponse,
-    AccessTokenResponse, UserResponse
+    AccessTokenResponse, UserResponse, UserProfileUpdate, ChangePasswordRequest
 )
 from app.core.security import (
     hash_password, verify_password,
@@ -375,3 +375,110 @@ async def logout_all_devices(
 async def get_current_user_info(current_user: CurrentUser):
     """获取当前登录用户信息"""
     return current_user
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_current_user_info(
+    payload: UserProfileUpdate,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+):
+    """
+    修改当前登录用户资料
+
+    - 仅允许修改用户名和邮箱
+    - role 等敏感字段不允许客户端修改
+    """
+    # 用户名唯一性检查（排除自己）
+    username_exists = await db.execute(
+        select(User).where(
+            User.username == payload.username,
+            User.id != current_user.id
+        )
+    )
+    if username_exists.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="用户名已存在"
+        )
+
+    # 邮箱唯一性检查（排除自己）
+    email_exists = await db.execute(
+        select(User).where(
+            User.email == payload.email,
+            User.id != current_user.id
+        )
+    )
+    if email_exists.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="邮箱已被使用"
+        )
+
+    current_user.username = payload.username
+    current_user.email = payload.email
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: ChangePasswordRequest,
+    response: Response,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+):
+    """
+    修改密码（修改后强制重新登录）
+
+    - 验证旧密码
+    - 更新密码哈希
+    - token_version + 1 使历史 Access Token 全部失效
+    - 清理所有 Refresh Token 并删除 Cookie
+    """
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前密码不正确"
+        )
+
+    if verify_password(payload.new_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密码不能与当前密码相同"
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.token_version += 1
+    current_user.failed_login_attempts = 0
+    current_user.lockout_until = None
+
+    # 立即拉黑本次请求的 Access Token，避免窗口期继续访问
+    access_payload = decode_token(credentials.credentials)
+    access_jti = access_payload.get("jti")
+    access_exp = access_payload.get("exp")
+    if access_jti and access_exp:
+        if isinstance(access_exp, (int, float)):
+            expires_at = datetime.utcfromtimestamp(access_exp).isoformat()
+        elif isinstance(access_exp, datetime):
+            expires_at = access_exp.isoformat()
+        else:
+            expires_at = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+        db.add(
+            AccessTokenBlocklist(
+                user_id=current_user.id,
+                jti=access_jti,
+                expires_at=expires_at,
+            )
+        )
+
+    # 清理所有 Refresh Token，要求所有设备重新登录
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == current_user.id))
+    await db.commit()
+
+    response.delete_cookie("refresh_token")
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response

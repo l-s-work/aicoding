@@ -22,7 +22,8 @@ const ClientAppLayout = () => {
 };
 
 const PageLayout = styled(Layout)`
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   background: #ffffff;
 `;
 
@@ -35,4 +36,3 @@ const ScrollContent = styled(Content)`
 `;
 
 export default ClientAppLayout;
-

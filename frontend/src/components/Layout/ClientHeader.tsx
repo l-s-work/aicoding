@@ -9,6 +9,7 @@ const { Header } = Layout;
 const menuItems = [
   { key: '/', label: <Link to="/">商品列表</Link> },
   { key: '/cart', label: <Link to="/cart">我的购物车</Link> },
+  { key: '/addresses', label: <Link to="/addresses">地址管理</Link> },
   { key: '/orders', label: <Link to="/orders">我的订单</Link> },
   { key: '/account', label: <Link to="/account">我的账号信息</Link> },
 ];
@@ -43,6 +44,8 @@ const ClientHeader = () => {
 };
 
 const StyledHeader = styled(Header)`
+  position: sticky;
+  top: 0;
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: 180px 1fr auto;
@@ -51,7 +54,7 @@ const StyledHeader = styled(Header)`
   background: #fff;
   border-bottom: 1px solid #f0f0f0;
   padding: 0 20px;
-  z-index: 10;
+  z-index: 100;
 
   .ant-menu {
     border-bottom: none;

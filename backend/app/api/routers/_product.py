@@ -251,6 +251,23 @@ async def get_categories(
 
 # ==================== 商品管理 ====================
 
+async def _get_product_with_category(db: DatabaseSession, product_id: int) -> Product:
+    """
+    按 ID 查询商品并预加载分类，避免响应序列化阶段触发异步懒加载。
+    """
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.category))
+        .where(Product.id == product_id)
+    )
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="商品不存在"
+        )
+    return product
+
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(product_data: ProductCreate, db: DatabaseSession, admin: CurrentAdmin):
     """创建商品 (仅管理员)"""
@@ -276,12 +293,13 @@ async def create_product(product_data: ProductCreate, db: DatabaseSession, admin
     
     db.add(product)
     await db.commit()
-    await db.refresh(product)
+    # 创建后重新查询并预加载 category，避免 FastAPI 响应校验时触发懒加载报错
+    product_with_category = await _get_product_with_category(db, product.id)
     
     # TODO: 异步生成 Embedding (后台任务)
     # 这里可以使用 FastAPI 的 BackgroundTasks 来异步生成向量
     
-    return product
+    return product_with_category
 
 
 @router.post("/upload-image")
@@ -487,11 +505,12 @@ async def update_product(
     product.updated_at = datetime.utcnow().isoformat()
     
     await db.commit()
-    await db.refresh(product)
+    # 更新后重新查询并预加载 category，避免响应阶段触发异步懒加载
+    product_with_category = await _get_product_with_category(db, product.id)
     
     # TODO: 如果名称或描述变更，需重新生成 Embedding
     
-    return product
+    return product_with_category
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

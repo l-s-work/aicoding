@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 /** 后端返回的用户信息结构 */
-interface UserInfo {
+export interface UserInfo {
   id: number;
   username: string;
   email: string;
@@ -14,6 +14,8 @@ interface AuthState {
   user: UserInfo | null;
   /** 登录：存储 token 和用户信息 */
   login: (token: string, user: UserInfo) => void;
+  /** 更新用户资料（不改 token） */
+  setUser: (user: UserInfo) => void;
   /** 登出：清除全部认证状态（配合 Axios 拦截器的 401 联锁清退） */
   logout: () => void;
   /** 判断当前是否已登录 */
@@ -32,6 +34,7 @@ const useAuthStore = create<AuthState>()(
       user: null,
 
       login: (token, user) => set({ token, user }),
+      setUser: user => set({ user }),
 
       logout: () => {
         set({ token: null, user: null });

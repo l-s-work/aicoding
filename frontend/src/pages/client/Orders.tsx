@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Input, Select, Space, Table, Tag, Typography, message } from 'antd';
 import styled from 'styled-components';
 import { get } from '@/utils/request';
+import { orderStatusMap } from '@/utils/dataformat';
+import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 
-const { Title } = Typography;
+const { Text } = Typography;
 
 interface OrderItem {
   id: number;
@@ -71,35 +73,41 @@ const Orders = () => {
 
   return (
     <ContentWrap>
-      <Title level={3}>我的订单</Title>
-      <Space wrap style={{ marginBottom: 14 }}>
-        <Input.Search
-          allowClear
-          style={{ width: 260 }}
-          placeholder="按商品名称模糊搜索"
-          onSearch={value => {
-            setPage(1);
-            setProductName(value.trim());
-          }}
-        />
-        <Select
-          allowClear
-          style={{ width: 160 }}
-          placeholder="按订单状态筛选"
-          value={status}
-          onChange={value => {
-            setPage(1);
-            setStatus(value);
-          }}
-          options={[
-            { label: '待支付', value: 'pending' },
-            { label: '已支付', value: 'paid' },
-            { label: '已发货', value: 'shipped' },
-            { label: '已完成', value: 'completed' },
-            { label: '已取消', value: 'cancelled' },
-          ]}
-        />
-      </Space>
+      <ClientPageHeader title="我的订单" fallbackPath="/" />
+      <FilterRow wrap style={{ marginBottom: 14 }}>
+        <FilterItem>
+          <FilterLabel>关键词</FilterLabel>
+          <Input.Search
+            allowClear
+            style={{ width: 260 }}
+            placeholder="按商品名称模糊搜索"
+            onSearch={value => {
+              setPage(1);
+              setProductName(value.trim());
+            }}
+          />
+        </FilterItem>
+        <FilterItem>
+          <FilterLabel>订单状态</FilterLabel>
+          <Select
+            allowClear
+            style={{ width: 160 }}
+            placeholder="按订单状态筛选"
+            value={status}
+            onChange={value => {
+              setPage(1);
+              setStatus(value);
+            }}
+            options={[
+              { label: '待支付', value: 'pending' },
+              { label: '已支付', value: 'paid' },
+              { label: '已发货', value: 'shipped' },
+              { label: '已完成', value: 'completed' },
+              { label: '已取消', value: 'cancelled' },
+            ]}
+          />
+        </FilterItem>
+      </FilterRow>
       <Table
         rowKey="id"
         loading={loading}
@@ -123,7 +131,7 @@ const Orders = () => {
           { title: '金额', render: (_, row) => `¥${row.total_amount.toFixed(2)}` },
           {
             title: '状态',
-            render: (_, row) => <Tag color={statusColorMap[row.status] ?? 'default'}>{row.status}</Tag>,
+            render: (_, row) => <Tag color={statusColorMap[row.status] ?? 'default'}>{orderStatusMap[row.status] ?? row.status}</Tag>,
           },
           { title: '下单时间', dataIndex: 'created_at' },
           {
@@ -144,6 +152,23 @@ const ContentWrap = styled.div`
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
+`;
+
+const FilterRow = styled(Space)`
+  display: flex;
+  flex-wrap: wrap;
+`;
+
+const FilterItem = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const FilterLabel = styled(Text)`
+  font-size: 13px;
+  color: #595959;
+  white-space: nowrap;
 `;
 
 export default Orders;

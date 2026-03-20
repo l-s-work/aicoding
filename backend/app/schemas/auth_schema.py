@@ -36,6 +36,37 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserProfileUpdate(BaseModel):
+    """用户资料更新请求（仅允许修改用户名、邮箱）"""
+    username: str
+    email: EmailStr
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        username = v.strip()
+        if len(username) < 3 or len(username) > 50:
+            raise ValueError("用户名长度必须在 3-50 个字符之间")
+        if not re.match(r"^[a-zA-Z0-9_]+$", username):
+            raise ValueError("用户名只能包含字母、数字和下划线")
+        return username
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求"""
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError("新密码长度必须在 8-20 个字符之间")
+        if not re.search(r"[a-zA-Z]", v) or not re.search(r"[0-9]", v):
+            raise ValueError("新密码必须同时包含字母和数字")
+        return v
+
+
 class ForgotPasswordRequest(BaseModel):
     """忘记密码重置请求（轻量方案：用户名 + 邮箱 + 新密码）"""
     username: str

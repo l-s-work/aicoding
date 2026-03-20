@@ -8,6 +8,7 @@ const ClientHome = lazy(() => import('@/pages/client/Home'));
 const ClientProduct = lazy(() => import('@/pages/client/Product'));
 const ClientCart = lazy(() => import('@/pages/client/Cart'));
 const ClientCheckout = lazy(() => import('@/pages/client/Checkout'));
+const ClientAddresses = lazy(() => import('@/pages/client/Addresses'));
 const ClientOrders = lazy(() => import('@/pages/client/Orders'));
 const ClientOrderDetail = lazy(() => import('@/pages/client/OrderDetail'));
 const ClientAccount = lazy(() => import('@/pages/client/Account'));
@@ -110,6 +111,14 @@ const router = createBrowserRouter([
             element: (
               <Suspense fallback={<PageFallback />}>
                 <ClientCheckout />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'addresses',
+            element: (
+              <Suspense fallback={<PageFallback />}>
+                <ClientAddresses />
               </Suspense>
             ),
           },

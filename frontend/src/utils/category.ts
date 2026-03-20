@@ -47,4 +47,3 @@ export function buildCategoryCascaderOptions(
     children: buildCategoryCascaderOptions(node.children ?? [], maxSelectableLevel),
   }));
 }
-

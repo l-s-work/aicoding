@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Button, Card, Descriptions, Skeleton, Space, Tag, Typography, message } from 'antd';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Button, Card, Descriptions, Modal, Skeleton, Space, Tag, Typography, message } from 'antd';
 import styled from 'styled-components';
 import { get } from '@/utils/request';
 import useCartStore from '@/store/useCartStore';
+import { saleStatusMap } from '@/utils/dataformat';
+import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 
 const { Title, Paragraph } = Typography;
 
@@ -20,6 +22,7 @@ interface ProductDetail {
 
 const ProductPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { addItem } = useCartStore();
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -40,8 +43,50 @@ const ProductPage = () => {
     void fetchDetail();
   }, [id]);
 
+  const handleAddToCart = () => {
+    if (!product) return;
+    addItem({
+      productId: product.id,
+      name: product.name,
+      cover: product.image_url || '',
+      price: product.price,
+    });
+    message.success('已加入购物车');
+  };
+
+  const handleBuyNow = () => {
+    if (!product) return;
+    if (product.status !== 'on_sale' || product.stock <= 0) {
+      message.warning('当前商品不可购买');
+      return;
+    }
+    Modal.confirm({
+      title: '确认立即购买？',
+      content: '下一步将进入结算页，请选择收货地址并进行下单二次确认。',
+      okText: '去结算',
+      cancelText: '取消',
+      onOk: () => {
+        navigate('/checkout', {
+          state: {
+            source: 'buy_now',
+            checkoutItems: [
+              {
+                productId: product.id,
+                name: product.name,
+                cover: product.image_url || '',
+                price: product.price,
+                quantity: 1,
+              },
+            ],
+          },
+        });
+      },
+    });
+  };
+
   return (
     <ContentWrap>
+      <ClientPageHeader title="商品详情" fallbackPath="/" />
       {loading || !product ? (
         <Skeleton active />
       ) : (
@@ -52,31 +97,31 @@ const ProductPage = () => {
               <Title level={3}>{product.name}</Title>
               <Space size={10}>
                 <Price>¥{product.price.toFixed(2)}</Price>
-                <Tag color={product.status === 'on_sale' ? 'green' : 'default'}>{product.status === 'on_sale' ? '在售' : '下架'}</Tag>
+                <Tag color={product.status === 'on_sale' ? 'green' : 'default'}>{saleStatusMap[product.status]}</Tag>
                 <Tag color={product.stock > 0 ? 'blue' : 'red'}>库存 {product.stock}</Tag>
               </Space>
               <Paragraph style={{ marginTop: 12 }}>{product.description || '暂无描述'}</Paragraph>
-              <Button
-                type="primary"
-                disabled={product.status !== 'on_sale' || product.stock <= 0}
-                onClick={() => {
-                  addItem({
-                    productId: product.id,
-                    name: product.name,
-                    cover: product.image_url || '',
-                    price: product.price,
-                  });
-                  message.success('已加入购物车');
-                }}
-              >
-                加入购物车
-              </Button>
+              <Space>
+                <Button
+                  type="default"
+                  disabled={product.status !== 'on_sale' || product.stock <= 0}
+                  onClick={handleAddToCart}
+                >
+                  加入购物车
+                </Button>
+                <Button
+                  type="primary"
+                  disabled={product.status !== 'on_sale' || product.stock <= 0}
+                  onClick={handleBuyNow}
+                >
+                  立即购买
+                </Button>
+              </Space>
             </InfoArea>
           </MainArea>
           <Descriptions bordered size="small" column={1} style={{ marginTop: 20 }}>
-            <Descriptions.Item label="商品ID">{product.id}</Descriptions.Item>
             <Descriptions.Item label="分类">{product.category?.name ?? '未分类'}</Descriptions.Item>
-            <Descriptions.Item label="状态">{product.status}</Descriptions.Item>
+            <Descriptions.Item label="状态">{saleStatusMap[product.status]}</Descriptions.Item>
           </Descriptions>
         </Card>
       )}

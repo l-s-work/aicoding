@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Card, Descriptions, Table, Tag, Typography, message } from 'antd';
+import { Card, Descriptions, Table, Tag, message } from 'antd';
 import styled from 'styled-components';
 import { get } from '@/utils/request';
-
-const { Title } = Typography;
+import { orderStatusMap } from '@/utils/dataformat';
+import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 
 interface OrderItem {
   id: number;
@@ -63,14 +63,14 @@ const OrderDetailPage = () => {
 
   return (
     <ContentWrap>
-      <Title level={3}>订单详情</Title>
+      <ClientPageHeader title="订单详情" fallbackPath="/orders" />
       <Card loading={loading}>
         {order && (
           <>
             <Descriptions bordered column={2}>
               <Descriptions.Item label="订单号">{order.order_no}</Descriptions.Item>
               <Descriptions.Item label="状态">
-                <Tag color={statusColorMap[order.status] ?? 'default'}>{order.status}</Tag>
+                <Tag color={statusColorMap[order.status] ?? 'default'}>{orderStatusMap[order.status] ?? order.status}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="总金额">¥{order.total_amount.toFixed(2)}</Descriptions.Item>
               <Descriptions.Item label="下单时间">{order.created_at}</Descriptions.Item>
