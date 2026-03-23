@@ -17,6 +17,7 @@
 - **组件与样式**：
   - **组件库**：Ant Design v6。
   - **AI 组件**：Ant Design X (`@ant-design/x`)。
+  - **AI Markdown 渲染**：对话、助手回复等存在 Markdown / 流式 Markdown 的场景，**如果符合业务与依赖条件，尽量优先使用 Ant Design X 的 `XMarkdown`（`@ant-design/x-markdown`）进行渲染**，避免自行拼接不完整的 Markdown 展示逻辑。
   - **组件优先级**：在满足业务需求与可维护性的前提下，**尽量优先使用 Ant Design 现有组件**（如 Table/Form/Modal/Drawer/Upload 等），避免重复造轮子。
   - **样式方案**：`styled-components` (CSS-in-JS)。**绝对禁止使用 Tailwind CSS 或冗杂的 className 堆砌**。
 

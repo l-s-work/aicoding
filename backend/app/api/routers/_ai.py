@@ -4,18 +4,14 @@ AI 对话路由：智能推荐、流式对话
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.api.deps import DatabaseSession, CurrentUser
-from app.db.models import ChatMessage, Product
+from app.db.models import ChatMessage
 from app.schemas.chat_schema import ChatMessageCreate, ChatMessageResponse, ChatHistoryResponse
-from app.services.ai_service import (
-    chat_with_ai, generate_streaming_response,
-    search_similar_products, sync_product_embedding
-)
+from app.services.ai_service import chat_with_ai, generate_streaming_response, sync_product_embedding
 
 router = APIRouter(prefix="/ai", tags=["AI 智能助手"])
 
@@ -28,66 +24,73 @@ async def chat_stream(
 ):
     """
     AI 对话流式接口 (SSE)
-    
-    - 前端通过 EventSource 连接
-    - 实时打字机效果
-    - 返回推荐商品卡片
+
+    - 前端通过 fetch + SSE 读取打字机流
+    - 同一条回复中可同时返回文本和结构化卡片
     """
-    # 准备对话数据
     chat_data = await chat_with_ai(
         db=db,
         user_id=current_user.id,
         user_message=message_data.content,
         context=message_data.context
     )
-    
+
     messages = chat_data["messages"]
-    similar_products = chat_data["similar_products"]
-    
-    # 定义 SSE 生成器
+    ui_cards = chat_data["ui_cards"]
+    direct_answer = chat_data.get("direct_answer")
+
     async def event_generator():
-        # 1. 先发送推荐商品卡片
-        if similar_products:
-            products_json = [
-                {
-                    "id": item["product"].id,
-                    "name": item["product"].name,
-                    "price": item["product"].price,
-                    "image_url": item["product"].image_url,
-                    "similarity": item["similarity"]
-                }
-                for item in similar_products
-            ]
-            
-            yield f"data: {json.dumps({'type': 'products', 'products': products_json}, ensure_ascii=False)}\n\n"
-        
-        # 2. 流式输出 AI 回复
+        if isinstance(direct_answer, str) and direct_answer.strip():
+            yield f"data: {json.dumps({'type': 'delta', 'content': direct_answer}, ensure_ascii=False)}\n\n"
+            if ui_cards:
+                yield f"data: {json.dumps({'type': 'cards', 'cards': ui_cards}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+            assistant_msg = ChatMessage(
+                user_id=current_user.id,
+                role="assistant",
+                content=direct_answer,
+                ui_type="text" if not ui_cards else "structured_cards",
+                payload=json.dumps(ui_cards, ensure_ascii=False) if ui_cards else None,
+                created_at=datetime.utcnow().isoformat()
+            )
+            db.add(assistant_msg)
+            await db.commit()
+            return
+
         full_response = ""
         async for chunk in generate_streaming_response(messages):
-            # 解析内容
+            if chunk == "data: [DONE]\n\n":
+                continue
+
             if chunk.startswith("data: ") and chunk != "data: [DONE]\n\n":
                 try:
                     data = json.loads(chunk[6:])
-                    content = data.get("content", "")
+                    content = data.get("content", "") if isinstance(data, dict) else ""
                     if content:
                         full_response += content
-                except:
+                except json.JSONDecodeError:
                     pass
-            
+
             yield chunk
-        
-        # 3. 保存 AI 回复到数据库
+
+        if ui_cards:
+            # 结构化卡片按接口输出顺序紧跟在文本之后返回，
+            # 由前端直接按事件顺序展示，避免“卡片先到、文字后补”的错位体验。
+            yield f"data: {json.dumps({'type': 'cards', 'cards': ui_cards}, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+
         assistant_msg = ChatMessage(
             user_id=current_user.id,
             role="assistant",
             content=full_response,
-            ui_type="text" if not similar_products else "product_cards",
-            payload=json.dumps(products_json, ensure_ascii=False) if similar_products else None,
+            ui_type="text" if not ui_cards else "structured_cards",
+            payload=json.dumps(ui_cards, ensure_ascii=False) if ui_cards else None,
             created_at=datetime.utcnow().isoformat()
         )
         db.add(assistant_msg)
         await db.commit()
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -106,62 +109,62 @@ async def chat_non_stream(
 ):
     """
     AI 对话非流式接口 (传统 JSON 响应)
-    
+
     - 用于不支持 SSE 的场景
     """
     from openai import AsyncOpenAI
     from app.core.config import settings
-    
+
     client = AsyncOpenAI(
         api_key=settings.OPENAI_API_KEY,
         base_url=settings.OPENAI_BASE_URL
     )
-    
-    # 准备对话
+
     chat_data = await chat_with_ai(
         db=db,
         user_id=current_user.id,
         user_message=message_data.content,
         context=message_data.context
     )
-    
+
     messages = chat_data["messages"]
-    similar_products = chat_data["similar_products"]
-    
-    # 调用 OpenAI（非流式）
+    ui_cards = chat_data["ui_cards"]
+    direct_answer = chat_data.get("direct_answer")
+
+    if isinstance(direct_answer, str) and direct_answer.strip():
+        assistant_msg = ChatMessage(
+            user_id=current_user.id,
+            role="assistant",
+            content=direct_answer,
+            ui_type="text" if not ui_cards else "structured_cards",
+            payload=json.dumps(ui_cards, ensure_ascii=False) if ui_cards else None,
+            created_at=datetime.utcnow().isoformat()
+        )
+        db.add(assistant_msg)
+        await db.commit()
+        await db.refresh(assistant_msg)
+        return assistant_msg
+
     response = await client.chat.completions.create(
         model=settings.OPENAI_MODEL,
         messages=messages,
         temperature=0.7,
     )
-    
-    assistant_content = response.choices[0].message.content
-    
-    # 保存回复
-    products_json = None
-    if similar_products:
-        products_json = [
-            {
-                "id": item["product"].id,
-                "name": item["product"].name,
-                "price": item["product"].price,
-                "image_url": item["product"].image_url,
-            }
-            for item in similar_products
-        ]
-    
+
+    assistant_content = response.choices[0].message.content or ""
+
     assistant_msg = ChatMessage(
         user_id=current_user.id,
         role="assistant",
         content=assistant_content,
-        ui_type="text" if not similar_products else "product_cards",
-        payload=json.dumps(products_json, ensure_ascii=False) if products_json else None,
+        ui_type="text" if not ui_cards else "structured_cards",
+        payload=json.dumps(ui_cards, ensure_ascii=False) if ui_cards else None,
         created_at=datetime.utcnow().isoformat()
     )
     db.add(assistant_msg)
     await db.commit()
     await db.refresh(assistant_msg)
-    
+
     return assistant_msg
 
 
@@ -179,8 +182,8 @@ async def get_chat_history(
         .limit(limit)
     )
     messages = result.scalars().all()
-    messages.reverse()  # 时间正序
-    
+    messages.reverse()
+
     return ChatHistoryResponse(
         total=len(messages),
         messages=messages
@@ -194,10 +197,10 @@ async def clear_chat_history(db: DatabaseSession, current_user: CurrentUser):
         select(ChatMessage).where(ChatMessage.user_id == current_user.id)
     )
     messages = result.scalars().all()
-    
+
     for msg in messages:
         await db.delete(msg)
-    
+
     await db.commit()
 
 
@@ -210,7 +213,7 @@ async def sync_embedding(
 ):
     """
     同步商品 Embedding (管理员或开发测试用)
-    
+
     - force=True 强制重新生成
     """
     await sync_product_embedding(db, product_id, force=force)

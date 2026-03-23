@@ -36,6 +36,7 @@ class OrderItemResponse(BaseModel):
     id: int
     product_id: int
     product_name: str
+    category_name: Optional[str] = None
     buy_price: float
     quantity: int
     created_at: str

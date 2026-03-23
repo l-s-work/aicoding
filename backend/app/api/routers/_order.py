@@ -9,7 +9,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import DatabaseSession, CurrentUser, CurrentAdmin
-from app.db.models import Order, OrderItem, User
+from app.db.models import Order, OrderItem, Product, User
 from app.schemas.order_schema import (
     OrderCreate, OrderResponse, OrderListResponse, OrderStatusUpdate
 )
@@ -22,6 +22,36 @@ def _attach_username(order: Order) -> None:
     """给订单对象附加 username 字段，便于响应模型直接返回"""
     if getattr(order, "user", None) is not None:
         order.username = order.user.username
+
+
+def _order_response_options():
+    """预加载订单响应所需的关系，避免懒加载触发异步错误。"""
+    return (
+        selectinload(Order.items).selectinload(OrderItem.product).selectinload(Product.category),
+        selectinload(Order.user),
+    )
+
+
+def _attach_order_item_categories(order: Order) -> None:
+    """把商品分类名挂到订单明细上，方便前端直接展示。"""
+    for item in getattr(order, "items", []):
+        product = getattr(item, "product", None)
+        category = getattr(product, "category", None)
+        item.category_name = getattr(category, "name", None)
+
+
+async def _load_order_for_user(db: DatabaseSession, order_id: int, *, user_id: Optional[int] = None) -> Order | None:
+    """按照订单 ID 重新加载完整订单对象。"""
+    query = select(Order).options(*_order_response_options()).where(Order.id == order_id)
+    if user_id is not None:
+        query = query.where(Order.user_id == user_id)
+
+    result = await db.execute(query)
+    order = result.scalar_one_or_none()
+    if order is not None:
+        _attach_username(order)
+        _attach_order_item_categories(order)
+    return order
 
 
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
@@ -48,11 +78,9 @@ async def create_order(
         address_id=order_data.address_id,
         items=items
     )
-    
-    # 加载订单明细
-    await db.refresh(order, ["items"])
-    
-    return order
+
+    loaded_order = await _load_order_for_user(db, order.id, user_id=current_user.id)
+    return loaded_order or order
 
 
 @router.get("", response_model=OrderListResponse)
@@ -89,12 +117,13 @@ async def get_orders(
     offset = (page - 1) * page_size
     query = query.order_by(Order.created_at.desc())
     query = query.offset(offset).limit(page_size)
-    query = query.options(selectinload(Order.items), selectinload(Order.user))  # 预加载订单明细+用户
+    query = query.options(*_order_response_options())  # 预加载订单明细+用户
     
     result = await db.execute(query)
     orders = result.scalars().all()
     for order in orders:
         _attach_username(order)
+        _attach_order_item_categories(order)
     
     return OrderListResponse(total=total, items=orders)
 
@@ -105,7 +134,7 @@ async def get_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items), selectinload(Order.user))
+        .options(*_order_response_options())
     )
     order = result.scalar_one_or_none()
     
@@ -116,6 +145,7 @@ async def get_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
         )
     
     _attach_username(order)
+    _attach_order_item_categories(order)
     return order
 
 
@@ -130,7 +160,7 @@ async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items), selectinload(Order.user))
+        .options(*_order_response_options())
     )
     order = result.scalar_one_or_none()
     
@@ -150,10 +180,8 @@ async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
     order.updated_at = datetime.utcnow().isoformat()
     
     await db.commit()
-    await db.refresh(order)
-    
-    _attach_username(order)
-    return order
+    loaded_order = await _load_order_for_user(db, order.id, user_id=current_user.id)
+    return loaded_order or order
 
 
 @router.post("/{order_id}/confirm-receipt", response_model=OrderResponse)
@@ -167,7 +195,7 @@ async def confirm_order_receipt(order_id: int, db: DatabaseSession, current_user
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items), selectinload(Order.user))
+        .options(*_order_response_options())
     )
     order = result.scalar_one_or_none()
     if not order:
@@ -184,10 +212,8 @@ async def confirm_order_receipt(order_id: int, db: DatabaseSession, current_user
     order.status = "completed"
     order.updated_at = datetime.utcnow().isoformat()
     await db.commit()
-    await db.refresh(order)
-
-    _attach_username(order)
-    return order
+    loaded_order = await _load_order_for_user(db, order.id, user_id=current_user.id)
+    return loaded_order or order
 
 
 @router.post("/{order_id}/cancel", response_model=OrderResponse)
@@ -201,7 +227,7 @@ async def cancel_order(order_id: int, db: DatabaseSession, current_user: Current
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == current_user.id)
-        .options(selectinload(Order.items), selectinload(Order.user))
+        .options(*_order_response_options())
     )
     order = result.scalar_one_or_none()
     
@@ -209,13 +235,11 @@ async def cancel_order(order_id: int, db: DatabaseSession, current_user: Current
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="订单不存在"
-        )
+    )
     
     await cancel_order_transaction(db, order)
-    await db.refresh(order)
-    
-    _attach_username(order)
-    return order
+    loaded_order = await _load_order_for_user(db, order.id, user_id=current_user.id)
+    return loaded_order or order
 
 
 # ==================== 管理员接口 ====================
@@ -260,12 +284,13 @@ async def get_all_orders(
     offset = (page - 1) * page_size
     query = query.order_by(Order.created_at.desc())
     query = query.offset(offset).limit(page_size)
-    query = query.options(selectinload(Order.items), selectinload(Order.user))
+    query = query.options(*_order_response_options())
     
     result = await db.execute(query)
     orders = result.scalars().all()
     for order in orders:
         _attach_username(order)
+        _attach_order_item_categories(order)
     
     return OrderListResponse(total=total, items=orders)
 
@@ -276,7 +301,7 @@ async def get_admin_order_detail(order_id: int, db: DatabaseSession, admin: Curr
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id)
-        .options(selectinload(Order.items), selectinload(Order.user))
+        .options(*_order_response_options())
     )
     order = result.scalar_one_or_none()
     if not order:
@@ -285,6 +310,7 @@ async def get_admin_order_detail(order_id: int, db: DatabaseSession, admin: Curr
             detail="订单不存在"
         )
     _attach_username(order)
+    _attach_order_item_categories(order)
     return order
 
 
@@ -305,7 +331,7 @@ async def update_order_status(
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id)
-        .options(selectinload(Order.items), selectinload(Order.user))
+        .options(*_order_response_options())
     )
     order = result.scalar_one_or_none()
     
@@ -332,7 +358,5 @@ async def update_order_status(
     order.updated_at = datetime.utcnow().isoformat()
     
     await db.commit()
-    await db.refresh(order)
-    
-    _attach_username(order)
-    return order
+    loaded_order = await _load_order_for_user(db, order.id)
+    return loaded_order or order

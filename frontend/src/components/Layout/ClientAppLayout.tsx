@@ -1,6 +1,7 @@
 import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import styled from 'styled-components';
+import ClientAiAssistant from '@/components/ai/ClientAiAssistant';
 import ClientHeader from './ClientHeader';
 
 const { Content } = Layout;
@@ -17,6 +18,7 @@ const ClientAppLayout = () => {
       <ScrollContent>
         <Outlet />
       </ScrollContent>
+      <ClientAiAssistant />
     </PageLayout>
   );
 };

@@ -11,6 +11,7 @@ import ClientPageHeader from '@/components/Layout/ClientPageHeader';
 interface OrderItem {
   id: number;
   product_name: string;
+  category_name?: string | null;
   quantity: number;
   buy_price: number;
 }
@@ -114,6 +115,11 @@ const OrderDetailPage = () => {
               pagination={false}
               columns={[
                 { title: '商品名称', dataIndex: 'product_name' },
+                {
+                  title: '分类',
+                  dataIndex: 'category_name',
+                  render: value => (value ? <Tag color="blue">{value}</Tag> : '-'),
+                },
                 { title: '数量', dataIndex: 'quantity' },
                 { title: '成交单价', render: (_, row) => formatAmount(row.buy_price) },
                 { title: '小计', render: (_, row) => formatAmount(row.buy_price * row.quantity) },
