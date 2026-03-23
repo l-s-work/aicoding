@@ -191,26 +191,26 @@ function parseAssistantCards(payload?: string | null): AssistantCard[] {
   }
 }
 
-function buildPageLabel(pageType?: string): string {
-  switch (pageType) {
-    case 'product':
-      return '商品详情页';
-    case 'orders':
-      return '订单列表页';
-    case 'order_detail':
-      return '订单详情页';
-    case 'addresses':
-      return '地址管理页';
-    case 'account':
-      return '账号页';
-    case 'cart':
-      return '购物车页';
-    case 'checkout':
-      return '结算页';
-    default:
-      return '商城首页';
-  }
-}
+// function buildPageLabel(pageType?: string): string {
+//   switch (pageType) {
+//     case 'product':
+//       return '商品详情页';
+//     case 'orders':
+//       return '订单列表页';
+//     case 'order_detail':
+//       return '订单详情页';
+//     case 'addresses':
+//       return '地址管理页';
+//     case 'account':
+//       return '账号页';
+//     case 'cart':
+//       return '购物车页';
+//     case 'checkout':
+//       return '结算页';
+//     default:
+//       return '商城首页';
+//   }
+// }
 
 const ClientAiAssistant = () => {
   const navigate = useNavigate();

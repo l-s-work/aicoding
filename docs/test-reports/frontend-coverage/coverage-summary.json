@@ -1,0 +1,213 @@
+{
+  "total": {
+    "lines": { "total": 6426, "covered": 124, "skipped": 0, "pct": 1.92 },
+    "statements": { "total": 6426, "covered": 124, "skipped": 0, "pct": 1.92 },
+    "functions": { "total": 60, "covered": 15, "skipped": 0, "pct": 25 },
+    "branches": { "total": 65, "covered": 33, "skipped": 0, "pct": 50.76 },
+    "branchesTrue": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\App.tsx": {
+    "lines": { "total": 105, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 105, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\main.tsx": {
+    "lines": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\components\\Layout\\AdminAppLayout.tsx": {
+    "lines": { "total": 60, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 60, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\components\\Layout\\AdminHeader.tsx": {
+    "lines": { "total": 72, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 72, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\components\\Layout\\ClientAppLayout.tsx": {
+    "lines": { "total": 40, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 40, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\components\\Layout\\ClientHeader.tsx": {
+    "lines": { "total": 74, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 74, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\components\\Layout\\ClientPageHeader.tsx": {
+    "lines": { "total": 54, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 54, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\components\\ai\\ClientAiAssistant.tsx": {
+    "lines": { "total": 856, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 856, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\Forbidden.tsx": {
+    "lines": { "total": 85, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 85, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\ForgotPassword.tsx": {
+    "lines": { "total": 187, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 187, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\Login.tsx": {
+    "lines": { "total": 334, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 334, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\NotFound.tsx": {
+    "lines": { "total": 93, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 93, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\Register.tsx": {
+    "lines": { "total": 193, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 193, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\admin\\Dashboard.tsx": {
+    "lines": { "total": 159, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 159, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\admin\\Orders.tsx": {
+    "lines": { "total": 286, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 286, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\admin\\ProductEditor.tsx": {
+    "lines": { "total": 345, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 345, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\admin\\Products.tsx": {
+    "lines": { "total": 389, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 389, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\admin\\Todos.tsx": {
+    "lines": { "total": 214, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 214, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\admin\\Users.tsx": {
+    "lines": { "total": 168, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 168, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Account.tsx": {
+    "lines": { "total": 234, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 234, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Addresses.tsx": {
+    "lines": { "total": 257, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 257, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Cart.tsx": {
+    "lines": { "total": 137, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 137, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Checkout.tsx": {
+    "lines": { "total": 449, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 449, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Home.tsx": {
+    "lines": { "total": 427, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 427, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\OrderDetail.tsx": {
+    "lines": { "total": 147, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 147, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Orders.tsx": {
+    "lines": { "total": 195, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 195, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\pages\\client\\Product.tsx": {
+    "lines": { "total": 163, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 163, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\router\\PrivateRoute.tsx": {
+    "lines": { "total": 90, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 90, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\router\\index.tsx": {
+    "lines": { "total": 239, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 239, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\store\\useAuthStore.ts": {
+    "lines": { "total": 22, "covered": 19, "skipped": 0, "pct": 86.36 },
+    "functions": { "total": 6, "covered": 5, "skipped": 0, "pct": 83.33 },
+    "statements": { "total": 22, "covered": 19, "skipped": 0, "pct": 86.36 },
+    "branches": { "total": 5, "covered": 5, "skipped": 0, "pct": 100 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\store\\useCartStore.ts": {
+    "lines": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "functions": { "total": 7, "covered": 5, "skipped": 0, "pct": 71.42 },
+    "statements": { "total": 37, "covered": 35, "skipped": 0, "pct": 94.59 },
+    "branches": { "total": 14, "covered": 14, "skipped": 0, "pct": 100 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\utils\\category.ts": {
+    "lines": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 },
+    "functions": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 },
+    "statements": { "total": 23, "covered": 23, "skipped": 0, "pct": 100 },
+    "branches": { "total": 7, "covered": 4, "skipped": 0, "pct": 57.14 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\utils\\dataformat.ts": {
+    "lines": { "total": 18, "covered": 18, "skipped": 0, "pct": 100 },
+    "functions": { "total": 1, "covered": 1, "skipped": 0, "pct": 100 },
+    "statements": { "total": 18, "covered": 18, "skipped": 0, "pct": 100 },
+    "branches": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 }
+  },
+  "D:\\AICoding作业\\frontend\\src\\utils\\request.ts": {
+    "lines": { "total": 270, "covered": 29, "skipped": 0, "pct": 10.74 },
+    "functions": { "total": 15, "covered": 2, "skipped": 0, "pct": 13.33 },
+    "statements": { "total": 270, "covered": 29, "skipped": 0, "pct": 10.74 },
+    "branches": { "total": 7, "covered": 7, "skipped": 0, "pct": 100 }
+  }
+}

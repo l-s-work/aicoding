@@ -101,7 +101,6 @@ const Login = () => {
 
     try {
       const response = await post<LoginResponse>('/auth/login', values);
-
       // 存储 Access Token 和用户信息到 Zustand（自动持久化）
       login(response.access_token, response.user);
 
@@ -212,11 +211,11 @@ const Login = () => {
         </Form>
 
         {/* 开发期提示信息 */}
-        <DevHint>
+        {/* <DevHint>
           <p>💡 开发测试账号：</p>
           <p>管理员：admin / admin123</p>
           <p>⚠️ 连续登录失败 5 次将锁定 10 分钟</p>
-        </DevHint>
+        </DevHint> */}
       </LoginCard>
 
       <Modal

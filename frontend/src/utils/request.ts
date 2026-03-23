@@ -261,6 +261,11 @@ request.interceptors.response.use(
     const detail = (error.response?.data as { detail?: string })?.detail ?? '';
     const requestUrl = originalRequest?.url ?? '';
     const isLoginRequest = requestUrl.includes('/auth/login');
+    const isPublicAuthRequest =
+      requestUrl.includes('/auth/login') ||
+      requestUrl.includes('/auth/register') ||
+      requestUrl.includes('/auth/forgot-password') ||
+      requestUrl.includes('/auth/recovery-request');
 
     // 403 表示角色越权或账号被封禁，直接清退
     if (status === 403) {
@@ -278,7 +283,18 @@ request.interceptors.response.use(
       return Promise.reject(new Error(detail || '权限不足，已退出登录'));
     }
 
-    // 401 且非刷新接口本身：尝试无感刷新 Access Token
+    // 公开认证接口（登录/注册/找回密码/恢复申请）返回 401 时：
+    // 直接把后端错误透传给页面，不走 refresh，避免登录失败被“联锁清退”覆盖。
+    if (status === 401 && isPublicAuthRequest) {
+      return Promise.reject(new Error(detail || '认证失败'));
+    }
+
+    // 若本地没有 Access Token，说明不是“已登录态过期”，也不应尝试 refresh。
+    if (status === 401 && !getAccessToken()) {
+      return Promise.reject(new Error(detail || '未登录或登录已过期'));
+    }
+
+    // 401 且非刷新接口本身：尝试无感刷新 Access Token（仅用于已登录态）
     if (status === 401 && originalRequest && !originalRequest.url?.includes('/auth/refresh')) {
       try {
         const newToken = await handleTokenRefresh();

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+    <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="43" time="5.148"
+        timestamp="2026-03-23T17:52:26.807224+08:00" hostname="lvsi">
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_normalize_similarity_text_should_strip_symbols_and_lowercase" time="0.002" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_build_similarity_tokens_should_include_chinese_bigrams" time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_compute_text_similarity_should_return_zero_for_empty_input" time="0.000" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_compute_text_similarity_should_be_high_for_substring_match" time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_normalize_budget_value_should_support_k_and_wan" time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_extract_product_request_constraints_should_parse_range_count_and_category"
+            time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_product_matches_constraints_should_filter_by_budget_and_category"
+            time="0.021" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_compute_vector_similarity_should_return_none_for_invalid_json" time="0.002" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_compute_vector_similarity_should_return_none_for_shape_mismatch" time="0.000" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_compute_vector_similarity_should_handle_zero_vector" time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_compute_vector_similarity_should_calculate_cosine_similarity" time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_parse_receiver_info_should_return_empty_dict_for_invalid_json" time="0.000" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_build_full_address_should_support_dict_and_model" time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_build_order_list_answer_should_cover_boundaries[0-0-\u4f60\u73b0\u5728\u8fd8\u6ca1\u6709\u8ba2\u5355\u3002]"
+            time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_build_order_list_answer_should_cover_boundaries[5-0-\u6211\u67e5\u5230\u4f60\u4e00\u5171\u6709 5 \u7b14\u8ba2\u5355\uff0c\u4f46\u5f53\u524d\u6ca1\u6709\u53ef\u5c55\u793a\u7684\u8ba2\u5355\u3002]"
+            time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_build_order_list_answer_should_cover_boundaries[2-2-\u4f60\u4e00\u5171\u6709 2 \u7b14\u8ba2\u5355\uff0c\u6211\u5df2\u7ecf\u628a\u5168\u90e8\u8ba2\u5355\u90fd\u5c55\u793a\u51fa\u6765\u4e86\u3002]"
+            time="0.001" />
+        <testcase classname="tests.test_ai_service_utils"
+            name="test_build_order_list_answer_should_cover_boundaries[9-3-\u4f60\u4e00\u5171\u6709 9 \u7b14\u8ba2\u5355\uff0c\u6211\u5148\u7ed9\u4f60\u5c55\u793a\u6700\u8fd1 3 \u7b14\uff0c\u65b9\u4fbf\u4f60\u5feb\u901f\u67e5\u770b\u3002]"
+            time="0.001" />
+        <testcase classname="tests.test_order_service"
+            name="test_create_order_success_should_snapshot_and_deduct_stock" time="0.225" />
+        <testcase classname="tests.test_order_service"
+            name="test_create_order_should_rollback_when_stock_not_enough" time="0.259" />
+        <testcase classname="tests.test_order_service"
+            name="test_create_order_should_return_404_when_product_not_exists" time="0.185" />
+        <testcase classname="tests.test_order_service"
+            name="test_create_order_should_rollback_when_address_not_owned" time="0.263" />
+        <testcase classname="tests.test_order_service"
+            name="test_create_order_should_retry_when_order_no_collides" time="0.266" />
+        <testcase classname="tests.test_order_service"
+            name="test_create_order_should_fail_after_retry_exhausted" time="0.225" />
+        <testcase classname="tests.test_order_service"
+            name="test_cancel_order_should_restore_stock_and_set_cancelled" time="0.227" />
+        <testcase classname="tests.test_order_service"
+            name="test_cancel_order_should_reject_invalid_status" time="0.143" />
+        <testcase classname="tests.test_schemas"
+            name="test_user_register_should_accept_valid_payload" time="0.010" />
+        <testcase classname="tests.test_schemas"
+            name="test_user_register_should_reject_invalid_username_chars" time="0.001" />
+        <testcase classname="tests.test_schemas"
+            name="test_user_register_should_reject_password_length_boundary[A123456]" time="0.001" />
+        <testcase classname="tests.test_schemas"
+            name="test_user_register_should_reject_password_length_boundary[A12345678901234567890]"
+            time="0.001" />
+        <testcase classname="tests.test_schemas"
+            name="test_change_password_should_reject_password_without_digit" time="0.001" />
+        <testcase classname="tests.test_schemas"
+            name="test_forgot_password_should_reject_invalid_username" time="0.001" />
+        <testcase classname="tests.test_schemas"
+            name="test_recovery_apply_should_trim_and_validate_reason" time="0.001" />
+        <testcase classname="tests.test_schemas"
+            name="test_recovery_apply_should_reject_short_reason" time="0.001" />
+        <testcase classname="tests.test_schemas" name="test_order_create_should_reject_empty_items"
+            time="0.000" />
+        <testcase classname="tests.test_schemas"
+            name="test_order_item_create_should_reject_non_positive_quantity" time="0.000" />
+        <testcase classname="tests.test_schemas"
+            name="test_order_status_update_should_reject_unknown_status" time="0.000" />
+        <testcase classname="tests.test_schemas"
+            name="test_address_create_should_reject_invalid_phone" time="0.002" />
+        <testcase classname="tests.test_security"
+            name="test_hash_password_should_not_equal_plain_text" time="0.359" />
+        <testcase classname="tests.test_security"
+            name="test_verify_password_should_fail_for_wrong_password" time="0.358" />
+        <testcase classname="tests.test_security"
+            name="test_create_access_token_should_include_required_claims" time="0.002" />
+        <testcase classname="tests.test_security"
+            name="test_create_refresh_token_should_be_refresh_type" time="0.001" />
+        <testcase classname="tests.test_security" name="test_decode_token_should_raise_when_expired"
+            time="0.001" />
+        <testcase classname="tests.test_security"
+            name="test_decode_token_should_raise_for_invalid_token" time="0.001" />
+    </testsuite>
+</testsuites>
