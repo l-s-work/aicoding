@@ -4,7 +4,12 @@
 """
 from typing import Optional
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 
 class Settings(BaseSettings):
@@ -28,6 +33,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"  # 可替换为代理地址
+    PEXELS_API_KEY: str = ""  # 商品种子图片抓取脚本可选配置
     
     # 千问 Embedding 配置（可选，不配置时回退到 OPENAI_*）
     QWEN_API_KEY: str = ""
@@ -44,6 +50,47 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ):
+        """
+        本项目优先读取 .env，避免本机/IDE 注入的同名环境变量覆盖开发配置。
+        加载顺序：初始化参数 > .env > 系统环境变量 > secrets 文件。
+        """
+        return (
+            init_settings,
+            dotenv_settings,
+            env_settings,
+            file_secret_settings,
+        )
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def validate_debug_bool(cls, value):
+        """
+        兼容多种 DEBUG 写法：
+        - true/false, 1/0, yes/no
+        - debug/dev/development
+        - release/prod/production
+        """
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on", "debug", "dev", "development"}:
+                return True
+            if normalized in {"0", "false", "no", "off", "release", "prod", "production"}:
+                return False
+        return value
     
     @property
     def cors_origins_list(self) -> list[str]:

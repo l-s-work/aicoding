@@ -125,7 +125,9 @@ backend/
 │   └── main.py
 ├── scripts/
 │   ├── dev_server.py
-│   └── init_db.py
+│   ├── init_db.py
+│   ├── seed_catalog.py
+│   └── fetch_seed_images.py
 ├── uploads/
 ├── .env.example
 ├── requirements.txt
@@ -168,7 +170,24 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 CORS_ORIGINS=http://localhost:5180,http://127.0.0.1:5180
 ```
 
-### 3. 初始化数据库与示例数据
+### 3. （可选）先抓取商品种子图片
+
+推荐使用图库 API，而不是直接爬普通网页（版权、反爬和稳定性风险更高）。
+
+```powershell
+cd D:\AICoding作业\backend
+$env:PEXELS_API_KEY="你的 Pexels API Key"
+python scripts\fetch_seed_images.py
+```
+
+执行后会：
+
+- 下载图片到 `backend/uploads/products`
+- 生成 `backend/scripts/seed_images.json`（商品名 -> 图片 URL 映射）
+
+如果未设置 `PEXELS_API_KEY`，脚本会自动回退为占位图映射，初始化流程仍可继续。
+
+### 4. 初始化数据库与示例数据
 
 ```powershell
 cd D:\AICoding作业\backend
@@ -180,9 +199,9 @@ python scripts\init_db.py
 - 数据表结构
 - 默认管理员账号：`admin / admin123`
 - 示例三级商品分类
-- 示例商品数据
+- 完整示例商品数据（名称、描述、价格、库存、标签、状态、图片）
 
-### 4. 启动后端服务
+### 5. 启动后端服务
 
 ```powershell
 cd D:\AICoding作业\backend
@@ -196,7 +215,7 @@ cd D:\AICoding作业\backend
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 5. 启动后可访问
+### 6. 启动后可访问
 
 - Swagger UI：`http://127.0.0.1:8000/docs`
 - ReDoc：`http://127.0.0.1:8000/redoc`
