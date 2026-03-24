@@ -11,3 +11,9 @@ Thumbs.db
 # Python cache (fallback for root scripts)
 __pycache__/
 *.py[cod]
+
+# 功能录屏
+功能录屏.*
+
+# zip 压缩包
+*.zip

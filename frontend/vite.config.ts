@@ -5,6 +5,10 @@ import path from 'path';
 const isProd = process.env.NODE_ENV === 'production';
 const parsedDevPort = Number(process.env.VITE_DEV_PORT ?? 5180);
 const devPort = Number.isInteger(parsedDevPort) && parsedDevPort > 0 ? parsedDevPort : 5180;
+// API 代理目标优先读取环境变量：
+// 1) Docker Compose 中使用 http://backend:8000
+// 2) 本机直接开发时回退到 http://127.0.0.1:8000
+const apiTarget = process.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -24,15 +28,13 @@ export default defineConfig({
     // 开发环境代理，将 /api 请求转发到 FastAPI 后端
     proxy: {
       '/api': {
-        // 固定走 IPv4，避免 localhost 在部分环境解析到 ::1 导致 ECONNREFUSED
-        target: 'http://127.0.0.1:8000',
+        target: apiTarget,
         changeOrigin: true,
-        // 前端统一使用 /api 前缀，代理到后端时去掉该前缀
-        rewrite: p => p.replace(/^\/api/, ''),
+        // 前端统一使用 /api 前缀，后端也统一挂在 /api 下，因此不做 rewrite
       },
       '/uploads': {
         // 商品图片静态资源代理（开发环境）
-        target: 'http://127.0.0.1:8000',
+        target: apiTarget,
         changeOrigin: true,
       },
     },

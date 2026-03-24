@@ -4,7 +4,7 @@ import { controllable, isAbortError } from './request';
 
 describe('request 工具函数', () => {
   it('controllable: 应提供可手动 abort 的 signal', () => {
-    let controller: AbortController | null = null;
+    let controller: AbortController | undefined;
     const config = controllable(ctrl => {
       controller = ctrl;
     });
@@ -12,7 +12,8 @@ describe('request 工具函数', () => {
     expect(config.signal).toBeDefined();
     expect(config.signal?.aborted).toBe(false);
 
-    controller?.abort();
+    expect(controller).toBeDefined();
+    controller!.abort();
     expect(config.signal?.aborted).toBe(true);
   });
 

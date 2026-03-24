@@ -3,6 +3,8 @@ FastAPI 主应用入口
 """
 from contextlib import asynccontextmanager
 from pathlib import Path
+import subprocess
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,12 +21,28 @@ async def lifespan(app: FastAPI):
     # 启动时初始化数据库
     print("🚀 正在初始化数据库...")
     await init_db()
+    await seed_demo_data()
     print("✅ 数据库初始化完成")
     
     yield
     
     # 关闭时清理资源
     print("👋 应用正在关闭...")
+
+
+async def seed_demo_data():
+    """
+    初始化演示数据。
+
+    这里直接复用 scripts/init_db.py，保持“表结构 + 管理员 + 分类 + 商品”的初始化逻辑
+    只有一份，避免 app 启动逻辑和脚本逻辑分叉。
+    """
+    project_root = Path(__file__).resolve().parents[1]
+    subprocess.run(
+        [sys.executable, "scripts/init_db.py"],
+        cwd=str(project_root),
+        check=True,
+    )
 
 
 # 创建 FastAPI 应用实例
@@ -54,13 +72,17 @@ app.add_middleware(
 
 
 # ==================== 路由注册 ====================
-
-app.include_router(_auth.router)
-app.include_router(_product.router)
-app.include_router(_order.router)
-app.include_router(_address.router)
-app.include_router(_ai.router)
-app.include_router(_admin.router)
+# 统一为所有业务接口添加 /api 前缀，前端可稳定使用 /api/* 访问后端
+# 例如：/api/auth/login、/api/products、/api/orders
+for router in (
+    _auth.router,
+    _product.router,
+    _order.router,
+    _address.router,
+    _ai.router,
+    _admin.router,
+):
+    app.include_router(router, prefix="/api")
 
 
 # ==================== 根路径 ====================

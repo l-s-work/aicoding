@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecommerce-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      # 运行时注入后端密钥与第三方配置，避免把 .env 烘焙进镜像
+      - ./backend/.env
+    volumes:
+      # 数据持久化 - SQLite 数据库文件
+      - ./data:/app/data
+      # 商品图片与上传资源，必须挂载到容器内的 /app/uploads
+      - ./backend/uploads:/app/uploads
+    environment:
+      # 生产容器内统一使用数据卷路径
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/ecommerce.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ecommerce-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecommerce-frontend
+    ports:
+      - "5181:5181"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - ecommerce-network
+
+networks:
+  ecommerce-network:
+    driver: bridge

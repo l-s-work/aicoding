@@ -21,10 +21,13 @@ from app.services.ai_service import (
     compute_text_similarity,
     compute_vector_similarity,
     extract_product_request_constraints,
+    infer_intents,
+    is_purchase_history_request,
     normalize_budget_value,
     normalize_similarity_text,
     parse_receiver_info,
     product_matches_constraints,
+    should_recommend_products,
 )
 
 
@@ -62,6 +65,33 @@ def test_extract_product_request_constraints_should_parse_range_count_and_catego
     assert constraints["price_max"] == 5000
     assert constraints["requested_count"] == 2
     assert "手机" in constraints["categories"]
+
+
+def test_extract_product_request_constraints_should_recognize_controller_category() -> None:
+    constraints = extract_product_request_constraints("游戏手柄")
+    assert "手柄" in constraints["categories"]
+
+
+def test_should_recommend_products_should_support_short_category_only_phrase() -> None:
+    assert should_recommend_products("游戏手柄") is True
+
+
+def test_infer_intents_should_include_product_for_controller_phrase() -> None:
+    intents = infer_intents("游戏手柄", {})
+    assert "product" in intents
+
+
+def test_is_purchase_history_request_should_cover_colloquial_phrases() -> None:
+    assert is_purchase_history_request("我最近购买了哪些商品") is True
+    assert is_purchase_history_request("最近买了什么") is True
+    assert is_purchase_history_request("我买了但是查不到订单") is True
+    assert is_purchase_history_request("推荐几款手机") is False
+
+
+def test_extract_product_request_constraints_should_accept_dynamic_keyword_map() -> None:
+    keyword_map = {"图书": ("图书", "书籍", "小说")}
+    constraints = extract_product_request_constraints("图书", keyword_map)
+    assert constraints["categories"] == ["图书"]
 
 
 def test_product_matches_constraints_should_filter_by_budget_and_category() -> None:

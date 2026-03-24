@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
-from app.db.models import ChatMessage, Order, OrderItem, Product, ProductEmbedding, ProductEmbeddingStatus, User, UserAddress
+from app.db.models import ChatMessage, Order, OrderItem, Product, ProductCategory, ProductEmbedding, ProductEmbeddingStatus, User, UserAddress
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,18 @@ PURCHASE_HISTORY_KEYWORDS = (
     "买过哪些商品",
     "下单商品",
     "历史下单过的商品",
+    "最近购买的商品",
+    "最近买的商品",
+    "最近买了哪些商品",
+    "最近购买了哪些商品",
+    "已购买的商品",
+    "已购商品",
+    "购买记录",
+    "购买清单",
+    "购买明细",
+    "消费记录",
+    "消费明细",
+    "历史购买记录",
 )
 ADDRESS_HINT_KEYWORDS = (
     "地址", "收货地址", "收件", "默认地址", "联系人", "手机号", "电话",
@@ -93,7 +105,13 @@ PRODUCT_CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "耳机": ("耳机", "蓝牙耳机", "头戴"),
     "音响": ("音响", "音箱", "speaker"),
     "手表": ("手表", "智能表", "watch"),
+    # 补充手柄类目，避免“游戏手柄”这类短句无法识别为商品意图
+    "手柄": ("手柄", "游戏手柄", "controller", "gamepad", "xbox手柄", "xbox 手柄", "ps手柄", "ps 手柄"),
     "游戏机": ("游戏机", "主机", "ps5", "switch", "xbox"),
+    # 兼容更多常见品类问法（图书/服装/鞋）
+    "图书": ("图书", "小说", "名著", "书籍", "编程书", "科技书"),
+    "服装": ("服装", "衣服", "穿搭", "上衣", "t恤", "衬衫", "连衣裙", "套装"),
+    "鞋": ("鞋", "跑鞋", "运动鞋", "球鞋"),
 }
 
 
@@ -273,6 +291,59 @@ def build_product_search_text(product: Product) -> str:
         for part in [product.name, product.description or "", tags_text]
         if part and part.strip()
     )
+
+
+def build_category_keyword_map(categories: list[ProductCategory]) -> dict[str, tuple[str, ...]]:
+    """
+    基于数据库分类构建品类关键词映射。
+
+    设计说明：
+    - 以三级/二级/一级分类名称作为基础关键词，自动扩展到推荐识别中；
+    - 保留静态 PRODUCT_CATEGORY_KEYWORDS 作为补充（英文别名等）。
+    """
+    category_map: dict[str, list[str]] = {}
+
+    for category in categories:
+        name = (category.name or "").strip()
+        if not name:
+            continue
+        category_map.setdefault(name, []).append(name)
+
+    merged: dict[str, tuple[str, ...]] = {}
+    for key, aliases in PRODUCT_CATEGORY_KEYWORDS.items():
+        merged[key] = tuple(dict.fromkeys([key, *aliases]))
+
+    for key, aliases in category_map.items():
+        if key in merged:
+            merged[key] = tuple(dict.fromkeys([*merged[key], *aliases]))
+        else:
+            merged[key] = tuple(dict.fromkeys([key, *aliases]))
+
+    return merged
+
+
+def build_category_path_map(categories: list[ProductCategory]) -> dict[int, list[str]]:
+    """
+    构建分类路径映射：category_id -> [一级, 二级, 三级]。
+    用于商品匹配时把父级分类一起纳入文本检索。
+    """
+    by_id: dict[int, ProductCategory] = {category.id: category for category in categories if category.id is not None}
+    path_map: dict[int, list[str]] = {}
+
+    for category in categories:
+        current = category
+        path: list[str] = []
+        while current is not None:
+            name = (current.name or "").strip()
+            if name:
+                path.append(name)
+            parent_id = getattr(current, "parent_id", None)
+            current = by_id.get(parent_id) if parent_id else None
+
+        if category.id is not None:
+            path_map[category.id] = list(reversed(path))
+
+    return path_map
 
 
 def normalize_similarity_text(text: str) -> str:
@@ -531,7 +602,11 @@ def has_any_keyword(message: str, keywords: tuple[str, ...]) -> bool:
     return any(keyword in message for keyword in keywords)
 
 
-def infer_intents(user_message: str, context: dict[str, Any]) -> set[str]:
+def infer_intents(
+    user_message: str,
+    context: dict[str, Any],
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
+) -> set[str]:
     """
     使用轻量规则判断用户问题命中哪些业务域。
 
@@ -544,7 +619,7 @@ def infer_intents(user_message: str, context: dict[str, Any]) -> set[str]:
 
     if has_any_keyword(message, PRODUCT_HINT_KEYWORDS):
         intents.add("product")
-    elif bool(extract_product_request_constraints(user_message).get("categories")):
+    elif bool(extract_product_request_constraints(user_message, category_keyword_map).get("categories")):
         # “音响呢”“换成耳机”这类短句可能没有“推荐/商品”等显式关键词，
         # 但已经带了明确品类，应视作商品咨询/推荐意图。
         intents.add("product")
@@ -583,23 +658,51 @@ def is_purchase_history_request(user_message: str) -> bool:
     if has_any_keyword(compact_message, PURCHASE_HISTORY_KEYWORDS):
         return True
 
-    return (
-        ("买过" in message or "下单" in message or "购买过" in message)
-        and "商品" in message
-    )
+    if ("买过" in message or "购买过" in message or "下单" in message) and "商品" in message:
+        return True
+
+    # 兼容“我最近购买了哪些商品”“我买了哪些商品”这类口语表达
+    if ("买了" in message or "购买了" in message or "最近购买" in message or "最近买" in message) and "商品" in message:
+        return True
+
+    # 兼容“最近买了什么”“历史买过啥”这类没有显式“商品”字样的问法
+    if re.search(r"(最近|历史|以前|之前).*(买过|买了|购买过|购买了|下单过|下单了)", message):
+        return True
+    if re.search(r"(买过|买了|购买过|购买了|下单过|下单了).*(哪些|什么|啥|哪)", message):
+        return True
+
+    # 处理“已购记录/消费记录”之类表达
+    if ("购买" in message or "买过" in message or "买了" in message) and any(keyword in message for keyword in ("记录", "清单", "明细")):
+        return True
+
+    # 处理“买了但查不到”的投诉式问题，直接引导到已购商品查询
+    if ("购买" in message or "买过" in message or "买了" in message) and any(keyword in message for keyword in ("没查到", "没有查到", "查不到", "找不到")):
+        if "商品" in message or "订单" in message:
+            return True
+
+    return False
 
 
-def should_recommend_products(user_message: str) -> bool:
+def should_recommend_products(
+    user_message: str,
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
+) -> bool:
     """判断用户是否在要推荐、找相似款或购物建议。"""
     message = (user_message or "").strip().lower()
     if has_any_keyword(message, PRODUCT_RECOMMEND_KEYWORDS):
         return True
 
-    constraints = extract_product_request_constraints(user_message)
-    return bool(constraints.get("categories")) and (
-        has_any_keyword(message, PRODUCT_DISCOVERY_KEYWORDS)
-        or has_any_keyword(message, PRODUCT_FOLLOW_UP_KEYWORDS)
-    )
+    constraints = extract_product_request_constraints(user_message, category_keyword_map)
+    categories = constraints.get("categories") or []
+    if not categories:
+        return False
+
+    if has_any_keyword(message, PRODUCT_DISCOVERY_KEYWORDS) or has_any_keyword(message, PRODUCT_FOLLOW_UP_KEYWORDS):
+        return True
+
+    # 兼容“游戏手柄”“蓝牙耳机”这类只有品类的短句，把它视作推荐请求。
+    compact_message = re.sub(r"\s+", "", message)
+    return len(compact_message) <= 12
 
 
 def is_product_follow_up_request(user_message: str, product_request: dict[str, Any]) -> bool:
@@ -630,6 +733,7 @@ def merge_product_request(base_request: dict[str, Any], fallback_request: dict[s
 def extract_recent_product_request_from_history(
     history: list[ChatMessage],
     current_user_message: str,
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
 ) -> dict[str, Any] | None:
     """从最近用户消息里恢复上一轮商品筛选条件，用于承接“换成音响”这类追问。"""
     skipped_current_message = False
@@ -642,10 +746,10 @@ def extract_recent_product_request_from_history(
             skipped_current_message = True
             continue
 
-        if not should_recommend_products(msg.content):
+        if not should_recommend_products(msg.content, category_keyword_map):
             continue
 
-        constraints = extract_product_request_constraints(msg.content)
+        constraints = extract_product_request_constraints(msg.content, category_keyword_map)
         if has_product_constraints(constraints):
             return constraints
 
@@ -656,9 +760,10 @@ def should_anchor_product_recommendation(
     user_message: str,
     context: dict[str, Any],
     product_request: dict[str, Any],
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
 ) -> bool:
     """判断本轮商品推荐是否应该锚定到某个参考商品，而不是纯按品类/预算筛选。"""
-    if not should_recommend_products(user_message):
+    if not should_recommend_products(user_message, category_keyword_map):
         return False
 
     message = (user_message or "").strip().lower()
@@ -691,7 +796,10 @@ def normalize_budget_value(raw_value: str, full_segment: str, *, counterpart: fl
     return int(round(value))
 
 
-def extract_product_request_constraints(user_message: str) -> dict[str, Any]:
+def extract_product_request_constraints(
+    user_message: str,
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
+) -> dict[str, Any]:
     """提取商品推荐里的硬约束：预算、数量、品类。"""
     message = (user_message or "").strip()
     normalized_message = message.lower()
@@ -727,10 +835,24 @@ def extract_product_request_constraints(user_message: str) -> dict[str, Any]:
             constraints["price_min"] = normalize_budget_value(min_match.group(1), min_match.group(0))
 
     categories: list[str] = []
-    for category, aliases in PRODUCT_CATEGORY_KEYWORDS.items():
-        if any(alias in normalized_message for alias in aliases):
+    effective_keyword_map = category_keyword_map or PRODUCT_CATEGORY_KEYWORDS
+    compact_message = re.sub(r"\s+", "", normalized_message)
+
+    for category, aliases in effective_keyword_map.items():
+        normalized_aliases = [str(alias).strip().lower() for alias in aliases if str(alias).strip()]
+        if not normalized_aliases:
+            continue
+
+        if any(alias in normalized_message for alias in normalized_aliases):
             categories.append(category)
-    constraints["categories"] = categories
+            continue
+
+        # 兼容“图书”“服装”这类短词，允许“消息词在别名中”的反向匹配。
+        if 2 <= len(compact_message) <= 4 and any(compact_message in alias for alias in normalized_aliases):
+            categories.append(category)
+
+    # 去重并保持顺序
+    constraints["categories"] = list(dict.fromkeys(categories))
 
     return constraints
 
@@ -745,7 +867,12 @@ def has_product_constraints(constraints: dict[str, Any]) -> bool:
     )
 
 
-def product_matches_constraints(product: Product, constraints: dict[str, Any]) -> bool:
+def product_matches_constraints(
+    product: Product,
+    constraints: dict[str, Any],
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
+    category_path_map: Optional[dict[int, list[str]]] = None,
+) -> bool:
     """按用户明确提出的预算/品类硬过滤推荐结果。"""
     price_min = constraints.get("price_min")
     price_max = constraints.get("price_max")
@@ -760,6 +887,11 @@ def product_matches_constraints(product: Product, constraints: dict[str, Any]) -
 
     raw_tags = safe_json_loads(product.tags, [])
     tag_text = " ".join(str(tag) for tag in raw_tags) if isinstance(raw_tags, list) else str(product.tags or "")
+    category_path_text = ""
+    if category_path_map and getattr(product, "category_id", None) is not None:
+        path = category_path_map.get(int(product.category_id)) or []
+        category_path_text = " ".join(str(part) for part in path if part)
+
     haystack = " ".join(
         part.lower()
         for part in [
@@ -767,12 +899,14 @@ def product_matches_constraints(product: Product, constraints: dict[str, Any]) -
             product.description or "",
             getattr(product.category, "name", None) or "",
             tag_text,
+            category_path_text,
         ]
         if part
     )
 
+    effective_keyword_map = category_keyword_map or PRODUCT_CATEGORY_KEYWORDS
     for category in categories:
-        aliases = PRODUCT_CATEGORY_KEYWORDS.get(category, (category,))
+        aliases = effective_keyword_map.get(category, (category,))
         if any(alias in haystack for alias in aliases):
             return True
     return False
@@ -781,12 +915,20 @@ def product_matches_constraints(product: Product, constraints: dict[str, Any]) -
 def filter_similar_products_by_constraints(
     similar_products: list[dict[str, Any]],
     constraints: dict[str, Any],
+    category_keyword_map: Optional[dict[str, tuple[str, ...]]] = None,
+    category_path_map: Optional[dict[int, list[str]]] = None,
 ) -> list[dict[str, Any]]:
     """先做硬过滤，再按用户要求的数量截断。"""
     filtered = [
         item
         for item in similar_products
-        if isinstance(item.get("product"), Product) and product_matches_constraints(item["product"], constraints)
+        if isinstance(item.get("product"), Product)
+        and product_matches_constraints(
+            item["product"],
+            constraints,
+            category_keyword_map,
+            category_path_map,
+        )
     ]
 
     requested_count = constraints.get("requested_count")
@@ -838,15 +980,17 @@ def build_order_list_answer(order_count: int, shown_count: int) -> str:
     return f"你一共有 {order_count} 笔订单，我先给你展示最近 {shown_count} 笔，方便你快速查看。"
 
 
-def build_purchase_history_snapshot(orders: list[Order]) -> tuple[list[dict[str, Any]], str]:
+def build_purchase_history_snapshot(orders: list[Order]) -> tuple[list[dict[str, Any]], str, int]:
     """把全部历史订单汇总成按商品去重的购买清单。"""
     aggregated: dict[int, dict[str, Any]] = {}
     total_quantity = 0
+    missing_items = 0
 
     for order in orders:
         for item in order.items:
             product = getattr(item, "product", None)
             if product is None:
+                missing_items += 1
                 continue
 
             record = aggregated.get(product.id)
@@ -901,7 +1045,9 @@ def build_purchase_history_snapshot(orders: list[Order]) -> tuple[list[dict[str,
     )
     if lines:
         summary = summary + "\n" + "\n".join(lines)
-    return cards, summary
+    if missing_items > 0:
+        summary = summary + f"\n其中有 {missing_items} 个商品已下架或删除，暂时无法展示。"
+    return cards, summary, missing_items
 
 
 def extract_order_reference(user_message: str) -> str | None:
@@ -1446,16 +1592,21 @@ async def build_ai_business_context(
     2. 把订单/地址/账号等用户私有数据在后端查出后，以结构化数据形式交给模型
     3. 同时把需要前端回显的卡片整理出来，做到“回答”和“UI 回显”同源
     """
-    intents = infer_intents(user_message, context)
-    recommending_products = should_recommend_products(user_message)
-    product_request = extract_product_request_constraints(user_message) if recommending_products else {
+    # 动态读取分类词表，增强“图书/服装/鞋”等品类识别能力
+    category_result = await db.execute(select(ProductCategory))
+    category_keyword_map = build_category_keyword_map(list(category_result.scalars().all()))
+
+    purchase_history_request = is_purchase_history_request(user_message)
+    intents = infer_intents(user_message, context, category_keyword_map)
+    recommending_products = should_recommend_products(user_message, category_keyword_map)
+    product_request = extract_product_request_constraints(user_message, category_keyword_map) if recommending_products else {
         "requested_count": None,
         "price_min": None,
         "price_max": None,
         "categories": [],
     }
     if recommending_products and is_product_follow_up_request(user_message, product_request):
-        previous_product_request = extract_recent_product_request_from_history(history, user_message)
+        previous_product_request = extract_recent_product_request_from_history(history, user_message, category_keyword_map)
         if previous_product_request is not None:
             # 追问场景下继承上一轮预算/数量，只覆盖当前轮明确改动的条件。
             product_request = merge_product_request(product_request, previous_product_request)
@@ -1464,6 +1615,7 @@ async def build_ai_business_context(
         user_message,
         context,
         product_request,
+        category_keyword_map,
     )
     order_list_request = "order" in intents and is_order_list_request(user_message)
     current_product: Product | None = None
@@ -1479,7 +1631,7 @@ async def build_ai_business_context(
     ui_cards: list[dict[str, Any]] = []
     candidate_products: list[dict[str, Any]] = []
 
-    if needs_generic_clarification(intents, user_message):
+    if needs_generic_clarification(intents, user_message) and not purchase_history_request:
         return build_clarification_context(
             intents=intents,
             context=context,
@@ -1487,11 +1639,21 @@ async def build_ai_business_context(
             clarification_type="generic_target",
         )
 
-    if is_purchase_history_request(user_message):
+    if purchase_history_request:
         all_orders = await get_all_orders_for_user(db, user_id)
-        history_cards, summary = build_purchase_history_snapshot(all_orders)
+        history_cards, summary, missing_items = build_purchase_history_snapshot(all_orders)
         if not all_orders:
             summary = "你目前还没有历史下单记录。"
+        elif not history_cards and missing_items > 0:
+            summary = (
+                f"我查到你有 {len(all_orders)} 笔订单，但相关商品可能已下架或删除，暂时无法展示已购商品。"
+                "你可以到「我的订单」查看订单详情。"
+            )
+        elif not history_cards:
+            summary = (
+                f"我查到你有 {len(all_orders)} 笔订单，但没有找到可展示的商品明细。"
+                "你可以到「我的订单」查看订单详情。"
+            )
 
         return {
             "intents": sorted(intents | {"order", "product"}),
@@ -1545,7 +1707,8 @@ async def build_ai_business_context(
             if reference_product is not None:
                 reference_product_source = "history_product"
 
-    if reference_product is not None and "product" in intents and not recommending_products:
+    only_product_intent = intents == {"product"}
+    if reference_product is not None and only_product_intent and not recommending_products and not purchase_history_request:
         reason = "当前页面商品"
         if reference_product_source == "message_match":
             reason = "根据你这次提到的商品匹配"
@@ -1601,7 +1764,11 @@ async def build_ai_business_context(
             similar_products = []
 
         if recommending_products:
-            similar_products = filter_similar_products_by_constraints(similar_products, product_request)
+            similar_products = filter_similar_products_by_constraints(
+                similar_products,
+                product_request,
+                category_keyword_map,
+            )
 
         candidate_products = [
             {

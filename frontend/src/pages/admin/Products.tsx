@@ -50,7 +50,7 @@ const Products = () => {
 
   const [status, setStatus] = useState<'on_sale' | 'off_sale' | undefined>(undefined);
   const [keyword, setKeyword] = useState('');
-  const [level, setLevel] = useState<number | undefined>(undefined);
+  // const [level, setLevel] = useState<number | undefined>(undefined);
   // 多选分类：每项都是完整级联路径（如 [1, 3, 9]）
   const [categoryPaths, setCategoryPaths] = useState<number[][]>([]);
 
@@ -62,9 +62,7 @@ const Products = () => {
   const parentCategoryOptions = useMemo(() => buildCategoryCascaderOptions(categories, 2), [categories]);
 
   const selectedCategoryIds = useMemo(() => {
-    const leafIds = categoryPaths
-      .map(path => path[path.length - 1])
-      .filter((id): id is number => typeof id === 'number');
+    const leafIds = categoryPaths.map(path => path[path.length - 1]).filter((id): id is number => typeof id === 'number');
     return Array.from(new Set(leafIds));
   }, [categoryPaths]);
 
@@ -86,7 +84,7 @@ const Products = () => {
           page_size: pageSize,
           status,
           keyword: keyword || undefined,
-          level,
+          // level,
           category_ids: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
         },
         paramsSerializer: {
@@ -119,7 +117,7 @@ const Products = () => {
 
   useEffect(() => {
     void fetchProducts();
-  }, [page, pageSize, status, keyword, level, selectedCategoryIds]);
+  }, [page, pageSize, status, keyword, selectedCategoryIds]);
 
   const createCategory = async () => {
     try {
@@ -170,9 +168,9 @@ const Products = () => {
 
     return (
       <Space direction="vertical" size={2}>
-          <Tooltip title={embeddingStatus.last_error ? embeddingStatus.last_error :''}>
-            <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
-          </Tooltip>
+        <Tooltip title={embeddingStatus.last_error ? embeddingStatus.last_error : ''}>
+          <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
+        </Tooltip>
       </Space>
     );
   };
@@ -211,7 +209,7 @@ const Products = () => {
               ]}
             />
           </FilterItem>
-          <FilterItem>
+          {/* <FilterItem>
             <FilterLabel>层级</FilterLabel>
             <Select
               allowClear
@@ -228,7 +226,7 @@ const Products = () => {
                 { label: '三级', value: 3 },
               ]}
             />
-          </FilterItem>
+          </FilterItem> */}
           <FilterItem>
             <FilterLabel>分类</FilterLabel>
             <Cascader
@@ -272,21 +270,21 @@ const Products = () => {
           },
         }}
         columns={[
-          { title: 'ID', dataIndex: 'id', width: 80,fixed: 'left' },
-          { title: '商品名称', dataIndex: 'name', width: 220,fixed: 'left' },
+          { title: 'ID', dataIndex: 'id', width: 80, fixed: 'left' },
+          { title: '商品名称', dataIndex: 'name', width: 220, fixed: 'left' },
           {
             title: '一级分类',
-            render: (_, row) => (row.category?.id ? categoryPathMap.get(row.category.id)?.[0] ?? '-' : '-'),
+            render: (_, row) => (row.category?.id ? (categoryPathMap.get(row.category.id)?.[0] ?? '-') : '-'),
             width: 130,
           },
           {
             title: '二级分类',
-            render: (_, row) => (row.category?.id ? categoryPathMap.get(row.category.id)?.[1] ?? '-' : '-'),
+            render: (_, row) => (row.category?.id ? (categoryPathMap.get(row.category.id)?.[1] ?? '-') : '-'),
             width: 130,
           },
           {
             title: '三级分类',
-            render: (_, row) => (row.category?.id ? categoryPathMap.get(row.category.id)?.[2] ?? '-' : '-'),
+            render: (_, row) => (row.category?.id ? (categoryPathMap.get(row.category.id)?.[2] ?? '-') : '-'),
             width: 140,
           },
           { title: '价格', render: (_, row) => formatAmount(row.price), width: 120 },
@@ -309,43 +307,32 @@ const Products = () => {
             fixed: 'right',
             align: 'left',
             render: (_, row) => (
-                <Space size={4}>
-                  <Button type="link" onClick={() => navigate(`/admin/products/${row.id}/edit`)}>
-                    编辑
-                  </Button>
-                  <Button
-                    type="link"
-                    loading={syncingIds.includes(row.id)}
-                    disabled={row.embedding_status.status === 'pending'}
-                    onClick={() => void handleSyncEmbedding(row.id)}
-                  >
-                    {row.embedding_status.status === 'not_synced' ? '生成向量' : '重新向量化'}
-                  </Button>
-                </Space>
+              <Space size={4}>
+                <Button type="link" onClick={() => navigate(`/admin/products/${row.id}/edit`)}>
+                  编辑
+                </Button>
+                <Button
+                  type="link"
+                  loading={syncingIds.includes(row.id)}
+                  disabled={row.embedding_status.status === 'pending'}
+                  onClick={() => void handleSyncEmbedding(row.id)}
+                >
+                  {row.embedding_status.status === 'not_synced' ? '生成向量' : '重新向量化'}
+                </Button>
+              </Space>
             ),
           },
         ]}
         scroll={{ x: 1520 }}
       />
 
-      <Modal
-        title="新建分类"
-        open={categoryModalOpen}
-        onOk={() => void createCategory()}
-        onCancel={() => setCategoryModalOpen(false)}
-        destroyOnClose
-      >
+      <Modal title="新建分类" open={categoryModalOpen} onOk={() => void createCategory()} onCancel={() => setCategoryModalOpen(false)} destroyOnClose>
         <Form form={categoryForm} layout="vertical" initialValues={{ sort_order: 0 }}>
           <Form.Item label="分类名称" name="name" rules={[{ required: true, message: '请输入分类名称' }]}>
             <Input placeholder="例如：智能手机" />
           </Form.Item>
           <Form.Item label="父级分类（可选一级/二级）" name="parent_path">
-            <Cascader
-              allowClear
-              changeOnSelect
-              options={parentCategoryOptions}
-              placeholder="不选则创建一级分类"
-            />
+            <Cascader allowClear changeOnSelect options={parentCategoryOptions} placeholder="不选则创建一级分类" />
           </Form.Item>
           <Form.Item label="排序权重" name="sort_order">
             <InputNumber min={0} style={{ width: '100%' }} />
@@ -384,6 +371,5 @@ const FilterLabel = styled.span`
   color: #595959;
   white-space: nowrap;
 `;
-
 
 export default Products;

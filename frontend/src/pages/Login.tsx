@@ -311,24 +311,4 @@ const ActionLink = styled(Link)`
   }
 `;
 
-/** 开发提示信息：浅灰色提示框 */
-const DevHint = styled.div`
-  margin-top: 24px;
-  padding: 16px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.8;
-  color: #595959;
-
-  p {
-    margin: 0;
-  }
-
-  p:first-child {
-    font-weight: 500;
-    margin-bottom: 4px;
-  }
-`;
-
 export default Login;
