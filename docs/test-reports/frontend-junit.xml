@@ -1,41 +1,61 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="14" failures="0" errors="0" time="0.0419205">
-    <testsuite name="src/store/useAuthStore.test.ts" timestamp="2026-03-23T09:56:22.117Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.0053128">
-        <testcase classname="src/store/useAuthStore.test.ts" name="useAuthStore &gt; login: 应写入 token 和用户信息，并变为已登录" time="0.0026176">
+<testsuites name="vitest tests" tests="22" failures="0" errors="0" time="0.1911676">
+    <testsuite name="src/utils/category.test.ts" timestamp="2026-03-25T05:28:50.715Z" hostname="lvsi" tests="2" failures="0" errors="0" skipped="0" time="0.0045852">
+        <testcase classname="src/utils/category.test.ts" name="category 工具函数 &gt; buildCategoryPathMap 应构建完整路径映射" time="0.0025993">
         </testcase>
-        <testcase classname="src/store/useAuthStore.test.ts" name="useAuthStore &gt; setUser: 应仅更新用户信息，不改 token" time="0.0007266">
-        </testcase>
-        <testcase classname="src/store/useAuthStore.test.ts" name="useAuthStore &gt; isAuthenticated: 无 token 时应返回 false" time="0.000209">
+        <testcase classname="src/utils/category.test.ts" name="category 工具函数 &gt; buildCategoryCascaderOptions 应按层级禁用选项" time="0.0004829">
         </testcase>
     </testsuite>
-    <testsuite name="src/store/useCartStore.test.ts" timestamp="2026-03-23T09:56:22.121Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.0073636">
-        <testcase classname="src/store/useCartStore.test.ts" name="useCartStore &gt; addItem: 新增商品成功，重复商品应忽略" time="0.0053822">
+    <testsuite name="src/utils/dataformat.test.ts" timestamp="2026-03-25T05:28:50.723Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.0220918">
+        <testcase classname="src/utils/dataformat.test.ts" name="dataformat 工具函数 &gt; 应返回正确的状态映射" time="0.0018384">
         </testcase>
-        <testcase classname="src/store/useCartStore.test.ts" name="useCartStore &gt; updateQuantity: 数量 &lt;= 0 时应移除商品" time="0.0004792">
+        <testcase classname="src/utils/dataformat.test.ts" name="dataformat 工具函数 &gt; formatAmount 应按人民币格式输出两位小数" time="0.0181878">
         </testcase>
-        <testcase classname="src/store/useCartStore.test.ts" name="useCartStore &gt; totalPrice: 按当前实现仅统计商品种类价格（不累计 quantity）" time="0.0003231">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/utils/category.test.ts" timestamp="2026-03-23T09:56:22.122Z" hostname="lvsi" tests="2" failures="0" errors="0" skipped="0" time="0.004791">
-        <testcase classname="src/utils/category.test.ts" name="category 工具函数 &gt; buildCategoryPathMap 应构建完整路径映射" time="0.0026077">
-        </testcase>
-        <testcase classname="src/utils/category.test.ts" name="category 工具函数 &gt; buildCategoryCascaderOptions 应按层级禁用选项" time="0.000494">
+        <testcase classname="src/utils/dataformat.test.ts" name="dataformat 工具函数 &gt; formatAmount 在 NaN/Infinity 时应回退为 0" time="0.0004224">
         </testcase>
     </testsuite>
-    <testsuite name="src/utils/dataformat.test.ts" timestamp="2026-03-23T09:56:22.123Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.0183332">
-        <testcase classname="src/utils/dataformat.test.ts" name="dataformat 工具函数 &gt; 应返回正确的状态映射" time="0.0019318">
+    <testsuite name="src/utils/request.test.ts" timestamp="2026-03-25T05:28:50.724Z" hostname="lvsi" tests="7" failures="0" errors="0" skipped="0" time="0.0193253">
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; controllable: 应提供可手动 abort 的 signal" time="0.0027187">
         </testcase>
-        <testcase classname="src/utils/dataformat.test.ts" name="dataformat 工具函数 &gt; formatAmount 应按人民币格式输出两位小数" time="0.0145828">
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; controllable: 传入外部 signal 时应合并取消状态" time="0.0011021">
         </testcase>
-        <testcase classname="src/utils/dataformat.test.ts" name="dataformat 工具函数 &gt; formatAmount 在 NaN/Infinity 时应回退为 0" time="0.0004712">
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; isAbortError: 应识别 AbortError 与 axios cancel" time="0.0005384">
+        </testcase>
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; get/post/put/patch/del: 应调用 axios 实例对应方法" time="0.0044316">
+        </testcase>
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; upload: File 入参应自动封装为 FormData 并走 multipart" time="0.0017364">
+        </testcase>
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; download: 应创建 Blob URL 并触发下载" time="0.005534">
+        </testcase>
+        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; fetchSSE: 应按 SSE 协议解析 delta 与 DONE" time="0.0018956">
         </testcase>
     </testsuite>
-    <testsuite name="src/utils/request.test.ts" timestamp="2026-03-23T09:56:22.124Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.0061199">
-        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; controllable: 应提供可手动 abort 的 signal" time="0.0031485">
+    <testsuite name="src/router/index.test.ts" timestamp="2026-03-25T05:28:50.727Z" hostname="lvsi" tests="1" failures="0" errors="0" skipped="0" time="0.0027062">
+        <testcase classname="src/router/index.test.ts" name="router 配置 &gt; 应包含公开路由、C端路由和B端路由入口" time="0.0017978">
         </testcase>
-        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; controllable: 传入外部 signal 时应合并取消状态" time="0.0006935">
+    </testsuite>
+    <testsuite name="src/router/PrivateRoute.test.tsx" timestamp="2026-03-25T05:28:50.728Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.1286257">
+        <testcase classname="src/router/PrivateRoute.test.tsx" name="PrivateRoute &gt; 无 token 时应重定向到登录页" time="0.0227975">
         </testcase>
-        <testcase classname="src/utils/request.test.ts" name="request 工具函数 &gt; isAbortError: 应识别 AbortError 与 axios cancel" time="0.0002786">
+        <testcase classname="src/router/PrivateRoute.test.tsx" name="PrivateRoute &gt; 角色不匹配时应重定向到 403" time="0.0041708">
+        </testcase>
+        <testcase classname="src/router/PrivateRoute.test.tsx" name="PrivateRoute &gt; token 与角色匹配且会话验证通过时应放行" time="0.1005756">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/store/useAuthStore.test.ts" timestamp="2026-03-25T05:28:50.729Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.0060474">
+        <testcase classname="src/store/useAuthStore.test.ts" name="useAuthStore &gt; login: 应写入 token 和用户信息，并变为已登录" time="0.0035045">
+        </testcase>
+        <testcase classname="src/store/useAuthStore.test.ts" name="useAuthStore &gt; setUser: 应仅更新用户信息，不改 token" time="0.0004699">
+        </testcase>
+        <testcase classname="src/store/useAuthStore.test.ts" name="useAuthStore &gt; isAuthenticated: 无 token 时应返回 false" time="0.0001893">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/store/useCartStore.test.ts" timestamp="2026-03-25T05:28:50.730Z" hostname="lvsi" tests="3" failures="0" errors="0" skipped="0" time="0.007786">
+        <testcase classname="src/store/useCartStore.test.ts" name="useCartStore &gt; addItem: 新增商品成功，重复商品应忽略" time="0.0037096">
+        </testcase>
+        <testcase classname="src/store/useCartStore.test.ts" name="useCartStore &gt; updateQuantity: 数量 &lt;= 0 时应移除商品" time="0.0004355">
+        </testcase>
+        <testcase classname="src/store/useCartStore.test.ts" name="useCartStore &gt; totalPrice: 按当前实现仅统计商品种类价格（不累计 quantity）" time="0.0003365">
         </testcase>
     </testsuite>
 </testsuites>

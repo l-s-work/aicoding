@@ -25,6 +25,10 @@ if (typeof AbortSignal.any !== 'function') {
   });
 }
 
+// React 18+/19 测试环境标记，避免 act(...) 警告。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();

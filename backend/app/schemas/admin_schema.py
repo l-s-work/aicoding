@@ -1,7 +1,7 @@
 """
 管理员相关 Pydantic Schemas
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import re
 
 
@@ -14,8 +14,7 @@ class AdminUserResponse(BaseModel):
     is_active: int
     created_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminUserListResponse(BaseModel):
@@ -96,8 +95,7 @@ class RecoveryRequestResponse(BaseModel):
     created_at: str
     processed_at: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RecoveryRequestListResponse(BaseModel):

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120  # 2小时
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7      # 7天
+    # Cookie 安全策略：生产环境建议开启（HTTPS 下生效）
+    COOKIE_SECURE: bool = False
     
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./ecommerce.db"
@@ -89,6 +91,24 @@ class Settings(BaseSettings):
             if normalized in {"1", "true", "yes", "on", "debug", "dev", "development"}:
                 return True
             if normalized in {"0", "false", "no", "off", "release", "prod", "production"}:
+                return False
+        return value
+
+    @field_validator("COOKIE_SECURE", mode="before")
+    @classmethod
+    def validate_cookie_secure_bool(cls, value):
+        """
+        兼容 COOKIE_SECURE 的多种写法，避免部署环境传值差异导致行为异常。
+        """
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
                 return False
         return value
     

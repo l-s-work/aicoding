@@ -38,9 +38,8 @@ class CategoryResponse(CategoryBase):
     """分类响应"""
     id: int
     created_at: str
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CategoryTreeResponse(BaseModel):
@@ -54,8 +53,7 @@ class CategoryTreeResponse(BaseModel):
     created_at: str
     children: list["CategoryTreeResponse"] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductBase(BaseModel):
@@ -111,8 +109,7 @@ class ProductResponse(ProductBase):
     category: Optional[CategoryResponse] = None  # 嵌套分类完整信息
     embedding_status: "ProductEmbeddingStatusResponse"
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductListResponse(BaseModel):

@@ -17,6 +17,19 @@ from app.services.order_service import create_order_transaction, cancel_order_tr
 
 router = APIRouter(prefix="/orders", tags=["订单"])
 
+# 管理员可执行的订单状态迁移矩阵。
+# 设计原则：
+# 1. 已完成状态只能由用户确认收货触发（shipped -> completed）
+# 2. 管理员负责“运营流转”：待处理/已支付 -> 发货/取消
+# 3. 允许同状态幂等更新，避免重复点击导致误报
+ADMIN_ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"paid", "cancelled"},
+    "paid": {"shipped", "cancelled"},
+    "shipped": set(),
+    "completed": set(),
+    "cancelled": set(),
+}
+
 
 def _attach_username(order: Order) -> None:
     """给订单对象附加 username 字段，便于响应模型直接返回"""
@@ -152,10 +165,11 @@ async def get_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
 @router.post("/{order_id}/pay", response_model=OrderResponse)
 async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUser):
     """
-    假支付接口
-    
-    - 将订单状态从 pending 改为 paid
-    - 实际项目应对接真实支付网关
+    假支付接口（兼容模式）
+
+    - pending -> paid
+    - paid 直接幂等返回（兼容“下单即已支付”的当前业务）
+    - 其他状态拒绝支付
     """
     result = await db.execute(
         select(Order)
@@ -170,10 +184,15 @@ async def pay_order(order_id: int, db: DatabaseSession, current_user: CurrentUse
             detail="订单不存在"
         )
     
+    if order.status == "paid":
+        _attach_username(order)
+        _attach_order_item_categories(order)
+        return order
+
     if order.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"订单状态错误（当前: {order.status}）"
+            detail=f"当前状态不允许支付（当前: {order.status}）"
         )
     
     order.status = "paid"
@@ -221,7 +240,7 @@ async def cancel_order(order_id: int, db: DatabaseSession, current_user: Current
     """
     取消订单
     
-    - 只能取消待支付订单
+    - 只能取消待支付/已支付（未发货）订单
     - 自动回滚库存
     """
     result = await db.execute(
@@ -341,17 +360,24 @@ async def update_order_status(
             detail="订单不存在"
         )
 
-    # 已完成订单禁止二次修改
-    if order.status == "completed":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="已完成订单不允许修改状态"
-        )
     # “已完成”应由用户确认收货触发，管理员不可直接设置
     if status_data.status == "completed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="已完成状态需由用户确认收货触发"
+        )
+
+    # 同状态更新按幂等处理，直接返回当前订单，避免重复操作报错
+    if status_data.status == order.status:
+        _attach_username(order)
+        _attach_order_item_categories(order)
+        return order
+
+    allowed_targets = ADMIN_ALLOWED_STATUS_TRANSITIONS.get(order.status, set())
+    if status_data.status not in allowed_targets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"订单状态不允许从 {order.status} 变更为 {status_data.status}"
         )
 
     order.status = status_data.status

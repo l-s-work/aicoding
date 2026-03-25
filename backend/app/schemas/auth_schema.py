@@ -1,7 +1,7 @@
 """
 认证相关 Pydantic Schemas
 """
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 import re
 
 
@@ -130,8 +130,7 @@ class UserResponse(BaseModel):
     role: str
     created_at: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TokenResponse(BaseModel):

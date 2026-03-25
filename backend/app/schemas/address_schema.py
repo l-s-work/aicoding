@@ -1,7 +1,7 @@
 """
 收货地址相关 Pydantic Schemas
 """
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 import re
 
 
@@ -45,6 +45,5 @@ class AddressResponse(AddressBase):
     id: int
     user_id: int
     created_at: str
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)

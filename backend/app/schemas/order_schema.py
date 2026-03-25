@@ -1,7 +1,7 @@
 """
 订单相关 Pydantic Schemas
 """
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 
 
@@ -41,8 +41,7 @@ class OrderItemResponse(BaseModel):
     quantity: int
     created_at: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderResponse(BaseModel):
@@ -58,8 +57,7 @@ class OrderResponse(BaseModel):
     updated_at: Optional[str] = None
     items: list[OrderItemResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderListResponse(BaseModel):

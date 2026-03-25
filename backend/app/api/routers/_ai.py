@@ -8,7 +8,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
-from app.api.deps import DatabaseSession, CurrentUser
+from app.api.deps import DatabaseSession, CurrentUser, CurrentAdmin
 from app.db.models import ChatMessage
 from app.schemas.chat_schema import ChatMessageCreate, ChatMessageResponse, ChatHistoryResponse
 from app.services.ai_service import chat_with_ai, generate_streaming_response, sync_product_embedding
@@ -209,11 +209,12 @@ async def sync_embedding(
     product_id: int,
     force: bool = False,
     db: DatabaseSession = None,
-    current_user: CurrentUser = None
+    admin: CurrentAdmin = None
 ):
     """
     同步商品 Embedding (管理员或开发测试用)
 
     - force=True 强制重新生成
     """
+    # 该接口会触发额外计算与外部调用，收敛到管理员权限，避免普通用户滥用。
     await sync_product_embedding(db, product_id, force=force)

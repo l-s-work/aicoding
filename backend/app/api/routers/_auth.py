@@ -16,6 +16,7 @@ from app.schemas.auth_schema import (
     UserRegister, UserLogin, ForgotPasswordRequest, TokenResponse,
     AccessTokenResponse, UserResponse, UserProfileUpdate, ChangePasswordRequest, AccountRecoveryApplyRequest
 )
+from app.core.config import settings
 from app.core.security import (
     hash_password, verify_password,
     create_access_token, create_refresh_token, decode_token
@@ -249,7 +250,8 @@ async def login(credentials: UserLogin, response: Response, db: DatabaseSession)
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,  # 生产环境应为 True (HTTPS)
+        # 通过配置控制，避免把“是否 HTTPS”硬编码到业务逻辑里。
+        secure=settings.COOKIE_SECURE,
         samesite="strict",
         max_age=7 * 24 * 60 * 60,  # 7天
     )
